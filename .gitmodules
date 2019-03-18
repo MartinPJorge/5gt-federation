@@ -1,4 +1,0 @@
-[submodule "ns-generator"]
-	path = ns-generator
-	url = https://github.com/MartinPJorge/vnfs-mapping.git
-	branch = 5gt
