@@ -32,16 +32,19 @@ if __name__ == '__main__':
     # Generate the NS graphs
     generated = []
     for i in range(args.numNSs):
+        print "Generating " + str(i) + "-th NS for config " + args.config
         ns = generator.yieldChain(
                 splits = cfg['splits'],
                 splitWidth = cfg['splitWidth'],
                 branches = cfg['branches'],
                 vnfs = cfg['vnfs'])
         generated.append(ns)
-        ns.writeCSV(vlAbs = args.out + '/vls-' + str(i) + '.csv',
-                vnfAbs = args.out + '/vnfs-' + str(i) + '.csv')
-        print "-----"
-        # TODO
+        vlAbs = args.out + '/vls-' + str(i) + '.csv'
+        vnfAbs = args.out + '/vnfs-' + str(i) + '.csv'
+        ns.writeCSV(vlAbs, vnfAbs)
+        print "  VNF CSV at: " + vlAbs
+        print "  VL CSV at: " + vnfAbs
+        
 
          
 
