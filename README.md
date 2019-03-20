@@ -2,13 +2,20 @@
 This repository is oriented to perform simulations for federation
 interactions in 5G networks.
 
+### Clone with submodule
+This repository uses the `vnfs-mapping` submodule to generate the network
+service graphs. To clone with the submodule run:
+```bash
+git clone --recursive https://github.com/MartinPJorge/5gt-federation.git
+```
+
 ## NS jukebox
 The NS jukebox tool `utils/ns_jukebox.py` randomly generates network service
-chains based on a set of characteristics specified within a configuration file
+graphs based on a set of characteristics specified within a configuration file
 as the one in `utils/config/nsGenConf.json`.
 
 These are the parameters available in the configuration file:
- * **splits**: number of splits within the NS chain. A split is the point in
+ * **splits**: number of splits within the NS graph. A split is the point in
    the network service graph where a VNF1 receives traffic only from VNF0, but
    then forwards traffic to VNF2...VNFn;
  * **splitWidth**: number of VNFs after the VNF split, if VNF1 forwards traffic
