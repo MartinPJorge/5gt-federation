@@ -78,6 +78,42 @@ requirements,processing_time,id,memory,vnf_name,disk,cpu,idVNF
 ```
 
 
+## NS splitter
+This script performs the clustering of a network service graph given the
+virtual links and VNFs CSV files.
+
+It is executed running:
+```bash
+python ns_splitter.py /tmp/vnfs-1.csv /tmp/vls-1.csv /tmp
+```
+where first and second arguments are the VNFs and VLs CSV files generated with
+`ns_jukebox.py`, respectively.
+And last parameter is the directory where the clusters are stored following
+naming convention
+`ns-NS_NUM-clusters-NUM_CLUSTERS-clusterCLUSTER_NUM-(vls|vnfs).csv`.
+That is, the script tries to create from 1 up to `len(VNF)` clusters, then it
+generates CSV files for the VNFs and VLs within each cluster.
+```txt
+=== 2 CLUSTERS ===
+                              | ns-1-clusters-2-cluster0-vnfs.csv
+                 __cluster-0__| ns-1-clusters-2-cluster0-vls.csv
+                /
+vnfs-1.csv |___/
+vls-1.csv  |   \              | ns-1-clusters-2-cluster1-vnfs.csv
+                \__cluster-1__| ns-1-clusters-2-cluster1-vls.csv
+
+=== 3 CLUSTERS ===
+                            
+                 __cluster-0__ ...
+                /
+vnfs-1.csv |___/___cluster-1__ ...
+vls-1.csv  |   \            
+                \__cluster-2__ ...
+
+[...]
+
+```
+
 
 #### Acknowledgements
 5G-TRANSFORMER Project under Grant 761536. Parts of this paper have
