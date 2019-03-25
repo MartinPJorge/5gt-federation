@@ -9,6 +9,13 @@ service graphs. To clone with the submodule run:
 git clone --recursive https://github.com/MartinPJorge/5gt-federation.git
 ```
 
+### Dependencies
+Following python packages must be installed for code execution:
+```bash
+pip install networkx==1.9.1
+pip install AgglomCluster
+```
+
 ## NS jukebox
 The NS jukebox tool `utils/ns_jukebox.py` randomly generates network service
 graphs based on a set of characteristics specified within a configuration file
