@@ -2,6 +2,7 @@ import csv
 import numpy as np
 import argparse
 import json
+import math
 from math import log
 
 
@@ -53,17 +54,17 @@ if __name__ == '__main__':
     # assign cpu, mem, disk, and lifetime for each one
     small_cpus, small_mems, small_disks, small_lifes = [], [], [], []
     for _ in small_arrivals:
-        small_cpus += [abs(np.random.normal(config['smallResources']['cpu_mean']))]
-        small_disks += [abs(np.random.normal(config['smallResources']['disk_mean']))]
-        small_mems += [abs(np.random.normal(config['smallResources']['mem_mean']))]
+        small_cpus += [math.ceil(abs(np.random.normal(config['smallResources']['cpu_mean'])))]
+        small_disks += [math.ceil(abs(np.random.normal(config['smallResources']['disk_mean'])))]
+        small_mems += [math.ceil(abs(np.random.normal(config['smallResources']['mem_mean'])))]
         small_lifes += [np.random.exponential(scale=float(1)/\
                                       float(config['smallResources']['rate']))]
 
     big_cpus, big_mems, big_disks, big_lifes = [], [], [], []
     for _ in big_arrivals:
-        big_cpus += [abs(np.random.normal(config['bigResources']['cpu_mean']))]
-        big_disks += [abs(np.random.normal(config['bigResources']['disk_mean']))]
-        big_mems += [abs(np.random.normal(config['bigResources']['mem_mean']))]
+        big_cpus += [math.ceil(abs(np.random.normal(config['bigResources']['cpu_mean'])))]
+        big_disks += [math.ceil(abs(np.random.normal(config['bigResources']['disk_mean'])))]
+        big_mems += [math.ceil(abs(np.random.normal(config['bigResources']['mem_mean'])))]
         big_lifes += [np.random.exponential(scale=float(1)/\
                                         float(config['bigResources']['rate']))]
 
