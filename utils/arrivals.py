@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 from math import log
+import random
 
 
 
@@ -57,16 +58,15 @@ if __name__ == '__main__':
         small_cpus += [math.ceil(abs(np.random.normal(config['smallResources']['cpu_mean'])))]
         small_disks += [math.ceil(abs(np.random.normal(config['smallResources']['disk_mean'])))]
         small_mems += [math.ceil(abs(np.random.normal(config['smallResources']['mem_mean'])))]
-        small_lifes += [np.random.exponential(scale=float(1)/\
-                                      float(config['smallResources']['rate']))]
+        small_lifes += [random.randint(1, 4)]
+
 
     big_cpus, big_mems, big_disks, big_lifes = [], [], [], []
     for _ in big_arrivals:
         big_cpus += [math.ceil(abs(np.random.normal(config['bigResources']['cpu_mean'])))]
         big_disks += [math.ceil(abs(np.random.normal(config['bigResources']['disk_mean'])))]
         big_mems += [math.ceil(abs(np.random.normal(config['bigResources']['mem_mean'])))]
-        big_lifes += [np.random.exponential(scale=float(1)/\
-                                        float(config['bigResources']['rate']))]
+        big_lifes += [random.randint(5, 10)]
 
     # Write CSV only if asked
     if args.outCSV:
@@ -75,14 +75,16 @@ if __name__ == '__main__':
                                          quoting=csv.QUOTE_MINIMAL)
 
             arrival_writer.writerow(['big', 'small', 'arrival_time', 'cpu', 'mem',
-                                     'disk'])
+                                     'disk', 'lifetime'])
             
             for i in range(len(small_arrivals)):
                 arrival_writer.writerow(['0', '1', small_arrivals[i],
-                        small_cpus[i], small_mems[i], small_disks[i]])
+                        small_cpus[i], small_mems[i], small_disks[i],
+                        small_lifes[i]])
             for i in range(len(big_arrivals)):
                 arrival_writer.writerow(['1', '0', big_arrivals[i], big_cpus[i],
-                                big_mems[i], big_disks[i]])
+                                big_mems[i], big_disks[i],
+                                big_lifes[i]])
 
 
     print("SMALL (last 5)")

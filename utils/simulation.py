@@ -6,11 +6,77 @@ from environment import Env
 from matplotlib import pyplot as plt
 
 
+def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
+        small_cpus, small_disks, small_mems, small_times, small_lifes,
+        domain_cpu, domain_disk, domain_mem):
+    #
+
+    i, j = -1, -1
+    current_time = 0
+    i = -1
+    j = -1
+    arrival_cpu = 0
+    arrival_mem = 0
+    arrival_disk = 0
+    arrival_length = 0
+    env_capacity = []
+    rewards = []
+
+    if((i+1) >= len(small_time)):
+        episode_reward.append(tot_profit)
+        i=-1
+        j=-1
+        env.reset()
+        break
+
+#   GET ARRIVAL INFORMATION
+    if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
+        j += 1
+        current_time = float(big_time[j])
+        arrival_cpu = big_cpus[j]
+        arrival_mem = big_mems[j]
+        arrival_disk = big_disks[j]
+        arrival_profit = np.random.uniform(5.0, 10.0)
+        arrival_length = np.random.uniform(5.0, 10.0)
+    else:
+        i += 1
+        current_time = float(small_time[i])
+        arrival_cpu = small_cpus[i]
+        arrival_mem = small_mems[i]
+        arrival_disk = small_disks[i]
+        arrival_profit = np.random.uniform(1.0, 3.0)
+        arrival_length = np.random.uniform(1.0, 4.0)
+
+
+    # UPDATE ENVIRONMENT WITH LATEST TIME
+    state, tot_profit, num_services = env.update_domain(current_time)
+
+    action = np.argmax(Q[state, :] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
+    print("time:", current_time)
+    print("action:", action)
+    actions.append(action)
+    now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
+    updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
+    print("Profit of step:", now_profit)
+    print("Profit total:", tot_profit+now_profit)
+    print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
+
+    # print("State", str(updated_state))
+    # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
+
+    Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
+    unique, counts = np.unique(actions, return_counts=True)
+    total_actions = dict(zip(unique, counts))
+    rewards.append(tot_profit)
+
+
+
 if __name__ == '__main__':
-    small_arrivals = []
-    big_arrivals = []
-    big_cpus, big_mems, big_disks, big_time = [], [], [], []
-    small_cpus, small_mems, small_disks, small_time = [], [], [], []
+small_arrivals = []
+big_arrivals = []
+big_cpus, big_mems, big_disks, big_time, bif_lifes = [], [], [], [], []
+small_cpus, small_mems, small_disks, small_time = [], [], [], []
+small_lifes = []
     # Parse args
     parser = argparse.ArgumentParser(description='Generate arrivals of' + \
                                                  'Services')
