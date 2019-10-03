@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 class Env:
     def __init__(self, cpu, memory, disk):
@@ -129,6 +130,8 @@ class Env:
                 print("Coeff:", coeff)
                 # coeff = np.random.uniform(0,service_profit)
                 now_profit = service_profit*coeff if coeff > 0 else (-5*service_profit)
+                #now_profit = random.randrange(1, 2)
+                now_profit = 1
                 self.profit += now_profit
                 self.total_num_services += 1
                 return [self.cpu, self.memory, self.disk, now_profit]
@@ -150,7 +153,7 @@ class Env:
             else:
                 print("penalty!")
                 self.profit -= (1.2*service_profit)
-                return [self.cpu, self.memory, self.disk, (-3.2*service_profit)]
+                return [self.cpu, self.memory, self.disk, (-1*service_profit)]
 
     def get_num_services(self):
         return int(len(self.service_length))

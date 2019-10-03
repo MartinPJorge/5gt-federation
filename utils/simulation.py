@@ -67,7 +67,7 @@ if __name__ == '__main__':
     env.print_status()
     current_time = 0
     alpha = 0.75
-    discount = 0.95
+    discount = 0.80
     sim_active = True
     i = -1
     j = -1
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
     print("Reverse calculate (state):", str(env.state_to_capacity(26568)))
 
-    episodes= 100
+    episodes= 50
     episode_reward = []
     actions = []
     num_services = 0
