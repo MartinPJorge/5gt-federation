@@ -54,19 +54,22 @@ if __name__ == '__main__':
 
     # assign cpu, mem, disk, and lifetime for each one
     small_cpus, small_mems, small_disks, small_lifes = [], [], [], []
+    small_profits = []
     for _ in small_arrivals:
         small_cpus += [math.ceil(abs(np.random.normal(config['smallResources']['cpu_mean'])))]
         small_disks += [math.ceil(abs(np.random.normal(config['smallResources']['disk_mean'])))]
         small_mems += [math.ceil(abs(np.random.normal(config['smallResources']['mem_mean'])))]
-        small_lifes += [random.randint(1, 4)]
+        small_lifes += [np.random.uniform(1.0, 4.0)]
+        small_profits += [np.random.uniform(1.0, 3.0)]
 
 
-    big_cpus, big_mems, big_disks, big_lifes = [], [], [], []
+    big_cpus, big_mems, big_disks, big_lifes, big_profits = [], [], [], [], []
     for _ in big_arrivals:
         big_cpus += [math.ceil(abs(np.random.normal(config['bigResources']['cpu_mean'])))]
         big_disks += [math.ceil(abs(np.random.normal(config['bigResources']['disk_mean'])))]
         big_mems += [math.ceil(abs(np.random.normal(config['bigResources']['mem_mean'])))]
-        big_lifes += [random.randint(5, 10)]
+        big_lifes += [np.random.uniform(5.0, 10.0)]
+        big_profits += [np.random.uniform(5.0, 10.0)]
 
     # Write CSV only if asked
     if args.outCSV:
@@ -75,16 +78,16 @@ if __name__ == '__main__':
                                          quoting=csv.QUOTE_MINIMAL)
 
             arrival_writer.writerow(['big', 'small', 'arrival_time', 'cpu', 'mem',
-                                     'disk', 'lifetime'])
+                                     'disk', 'lifetime', 'profit'])
             
             for i in range(len(small_arrivals)):
                 arrival_writer.writerow(['0', '1', small_arrivals[i],
                         small_cpus[i], small_mems[i], small_disks[i],
-                        small_lifes[i]])
+                        small_lifes[i], small_profits[i]])
             for i in range(len(big_arrivals)):
                 arrival_writer.writerow(['1', '0', big_arrivals[i], big_cpus[i],
                                 big_mems[i], big_disks[i],
-                                big_lifes[i]])
+                                big_lifes[i], big_profits[i]])
 
 
     print("SMALL (last 5)")

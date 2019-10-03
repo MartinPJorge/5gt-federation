@@ -74,7 +74,7 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
 if __name__ == '__main__':
 small_arrivals = []
 big_arrivals = []
-big_cpus, big_mems, big_disks, big_time, bif_lifes = [], [], [], [], []
+big_cpus, big_mems, big_disks, big_time, big_lifes = [], [], [], [], []
 small_cpus, small_mems, small_disks, small_time = [], [], [], []
 small_lifes = []
     # Parse args
@@ -103,11 +103,15 @@ small_lifes = []
                     big_disks += [float(row["disk"])]
                     big_mems += [float(row["mem"])]
                     big_time += [float(row["arrival_time"])]
+                    big_lifes += [float(row['lifetime'])]
+                    big_profit += [float(row['profit'])]
                 else:
                     small_cpus += [float(row["cpu"])]
                     small_disks += [float(row["disk"])]
                     small_mems += [float(row["mem"])]
                     small_time += [float(row["arrival_time"])]
+                    small_lifes += [float(row['lifetime'])]
+                    small_profit += [float(row['profit'])]
 
     print("SMALL (last 5)")
     print("\tarrivals: " + str(small_time[-5:]))
@@ -181,16 +185,16 @@ small_lifes = []
                 arrival_cpu = big_cpus[j]
                 arrival_mem = big_mems[j]
                 arrival_disk = big_disks[j]
-                arrival_profit = np.random.uniform(5.0, 10.0)
-                arrival_length = np.random.uniform(5.0, 10.0)
+                arrival_profit = big_profits[j]
+                arrival_length = big_lifes[j]
             else:
                 i += 1
                 current_time = float(small_time[i])
                 arrival_cpu = small_cpus[i]
                 arrival_mem = small_mems[i]
                 arrival_disk = small_disks[i]
-                arrival_profit = np.random.uniform(1.0, 3.0)
-                arrival_length = np.random.uniform(1.0, 4.0)
+                arrival_profit = small_profits[i]
+                arrival_length = small_lifes[i]
 
 
             # UPDATE ENVIRONMENT WITH LATEST TIME
