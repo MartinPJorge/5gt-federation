@@ -151,18 +151,20 @@ if __name__ == '__main__':
     arrival_length = 0
     env_capacity = []
     rewards = []
+    total_actions_episode = 0
     print(env.get_profit())
 
     tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk)
     tot_actions = 3
-    Q = np.zeros(shape=(tot_states,tot_actions), dtype=np.int)
+    tot_profit = 0
+    Q = np.zeros(shape=(tot_states, tot_actions), dtype=np.int)
     state = env.calculate_state()
     print("total_length:",tot_states)
     print("Q length: ",len(Q))
     print("State:", str(env.calculate_state()))
     print("Reverse calculate (state):", str(env.state_to_capacity(state)))
     print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
-    print("Reverse calculate (state):", str(env.state_to_capacity(26568)))
+    print("Reverse calculate (state):", str(env.state_to_capacity(state)))
 
     episodes= 50
     episode_reward = []
@@ -218,12 +220,12 @@ if __name__ == '__main__':
 
             Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
             unique, counts = np.unique(actions, return_counts=True)
-            total_actions = dict(zip(unique, counts))
+            total_actions_episode = dict(zip(unique, counts))
             rewards.append(tot_profit)
 
         print("Episode:", episode)
         print("Rewards:", episode_reward[episode-1])
-        print("Actions:", total_actions)
+        print("Actions:", total_actions_episode)
         print("Num.Services:", num_services)
 
 
