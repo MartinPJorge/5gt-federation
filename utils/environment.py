@@ -1,5 +1,7 @@
+import sys
 import numpy as np
 import random
+import math
 
 class Env:
     def __init__(self, cpu, memory, disk):
@@ -108,6 +110,39 @@ class Env:
             return int(self.calculate_state()), float(self.profit), self.total_num_services
         else:
             return int(0), float(self.profit), self.total_num_services
+
+
+    def enough_resources(self, asked_cpu, asked_mem, asked_disk):
+        return self.cpu >= asked_cpu and self.memory >= asked_mem and\
+                self.disk >= asked_disk
+
+
+    def action_profit(self, action, service_cpu, service_memory, service_disk,
+                      service_profit, arrival_time, service_length):
+        # reject
+        if action == 2:
+            return -service_profit
+        # FEDERATION
+        elif action == 1:
+            if float(self.time) <= float(arrival_time):
+                k = float(self.capacity[0]-self.cpu)/self.capacity[0]
+                l = float(self.capacity[1]-self.memory)/self.capacity[1]
+                m = float(self.capacity[2]-self.disk)/self.capacity[2]
+
+                coeff = k+l+m
+                print("Coeff:", coeff)
+                # coeff = np.random.uniform(0,service_profit)
+                now_profit = service_profit*coeff if coeff > 0 else (-5*service_profit)
+                #now_profit = random.randrange(1, 2)
+                now_profit = 1
+                return now_profit
+        # local deploy
+        else:
+            if action == 0 and self.enough_resources(service_cpu,
+                    service_memory, service_disk):
+                return service_profit
+            else:
+                return -math.inf
 
     def instantiate_service(self, action, service_cpu, service_memory, service_disk, service_profit, arrival_time, service_length):
         if action == 2:

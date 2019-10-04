@@ -7,8 +7,8 @@ from matplotlib import pyplot as plt
 
 
 def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
-        small_cpus, small_disks, small_mems, small_times, small_lifes,
-        domain_cpu, domain_disk, domain_mem):
+        big_profits, small_cpus, small_disks, small_mems, small_times,
+        small_lifes, small_profits, domain_cpu, domain_disk, domain_mem):
     #
 
     i, j = -1, -1
@@ -21,63 +21,66 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
     arrival_length = 0
     env_capacity = []
     rewards = []
+    total_profit = 0
 
-    if((i+1) >= len(small_time)):
-        episode_reward.append(tot_profit)
-        i=-1
-        j=-1
-        env.reset()
-        break
+    while True:
+        if((i+1) >= len(small_time)):
+            return tot_profit
 
-#   GET ARRIVAL INFORMATION
-    if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
-        j += 1
-        current_time = float(big_time[j])
-        arrival_cpu = big_cpus[j]
-        arrival_mem = big_mems[j]
-        arrival_disk = big_disks[j]
-        arrival_profit = np.random.uniform(5.0, 10.0)
-        arrival_length = np.random.uniform(5.0, 10.0)
-    else:
-        i += 1
-        current_time = float(small_time[i])
-        arrival_cpu = small_cpus[i]
-        arrival_mem = small_mems[i]
-        arrival_disk = small_disks[i]
-        arrival_profit = np.random.uniform(1.0, 3.0)
-        arrival_length = np.random.uniform(1.0, 4.0)
+        # GET ARRIVAL INFORMATION
+        if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
+            j += 1
+            current_time = float(big_time[j])
+            arrival_cpu = big_cpus[j]
+            arrival_mem = big_mems[j]
+            arrival_disk = big_disks[j]
+            arrival_profit = big_profits[j]
+            arrival_length = big_lifes[j]
+        else:
+            i += 1
+            current_time = float(small_time[i])
+            arrival_cpu = small_cpus[i]
+            arrival_mem = small_mems[i]
+            arrival_disk = small_disks[i]
+            arrival_profit = small_profits[i]
+            arrival_length = small_lifes[i]
 
 
-    # UPDATE ENVIRONMENT WITH LATEST TIME
-    state, tot_profit, num_services = env.update_domain(current_time)
+        # UPDATE ENVIRONMENT WITH LATEST TIME
+        state, tot_profit, num_services = env.update_domain(current_time)
 
-    action = np.argmax(Q[state, :] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
-    print("time:", current_time)
-    print("action:", action)
-    actions.append(action)
-    now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
-    updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
-    print("Profit of step:", now_profit)
-    print("Profit total:", tot_profit+now_profit)
-    print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
+        # Choose greedily best current action
+        now_profit = -math.inf
+        now_action = None
+        for action in [0, 1, 2]:
+            action_profit = env.action_profit(action, arrival_cpu, arrival_mem,
+                    arrival_disk, arrival_profit, arrival_time, arrival_length)
+            if action_profit > now_profit:
+                now_action = action
+                now_profit = action_profit
 
-    # print("State", str(updated_state))
-    # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
+        action = now_action
+        print("time:", current_time)
+        print("action:", action)
+        actions.append(action)
+        now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
+        updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
+        total_profit += now_profit
+        print("Profit of step:", now_profit)
+        print("Profit total:", tot_profit+now_profit)
+        print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
 
-    Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
-    unique, counts = np.unique(actions, return_counts=True)
-    total_actions = dict(zip(unique, counts))
-    rewards.append(tot_profit)
+    return total_profit
 
 
 
 if __name__ == '__main__':
-small_arrivals = []
-big_arrivals = []
-big_cpus, big_mems, big_disks, big_time, big_lifes = [], [], [], [], []
-small_cpus, small_mems, small_disks, small_time = [], [], [], []
-small_lifes = []
-    # Parse args
+    small_arrivals = []
+    big_arrivals = []
+    big_cpus, big_mems, big_disks, big_time, big_lifes = [], [], [], [], []
+    small_cpus, small_mems, small_disks, small_time = [], [], [], []
+    small_lifes, small_profits, big_profits = [], [], []
+        # Parse args
     parser = argparse.ArgumentParser(description='Generate arrivals of' + \
                                                  'Services')
     parser.add_argument('configFile', type=str,
@@ -104,14 +107,14 @@ small_lifes = []
                     big_mems += [float(row["mem"])]
                     big_time += [float(row["arrival_time"])]
                     big_lifes += [float(row['lifetime'])]
-                    big_profit += [float(row['profit'])]
+                    big_profits += [float(row['profit'])]
                 else:
                     small_cpus += [float(row["cpu"])]
                     small_disks += [float(row["disk"])]
                     small_mems += [float(row["mem"])]
                     small_time += [float(row["arrival_time"])]
                     small_lifes += [float(row['lifetime'])]
-                    small_profit += [float(row['profit'])]
+                    small_profits += [float(row['profit'])]
 
     print("SMALL (last 5)")
     print("\tarrivals: " + str(small_time[-5:]))
