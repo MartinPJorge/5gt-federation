@@ -3,16 +3,22 @@ set timestamps;
 param profit_federate;
 param profit_local;
 param profit_reject;
+param frees_cpu {timestamps};
+param frees_mem {timestamps};
+param frees_disk {timestamps};
 
 var federate {t in timestamps} binary;
 var local {t in timestamps} binary;
 var reject {t in timestamps} binary;
 var cpu {t in timestamps: card(t) > 1} :=
-        cpu[t] - local[prev(t)]*asked_cpu[prev(t)] + released[prev(t)];
+        cpu[t] - local[prev(t)]*asked_cpu[prev(t)]
+            + local[prev(t)]*frees_cpu[prev(t)];
 var mem {t in timestamps: card(t) > 1} :=
-        mem[t] - local[prev(t)]*asked_mem[prev(t)] + released[prev(t)];
+        mem[t] - local[prev(t)]*asked_mem[prev(t)]
+            + local[prev(t)]*frees_mem[prev(t)];
 var disk {t in timestamps: card(t) > 1} :=
-        disk[t] - local[prev(t)]*asked_disk[prev(t)] + released[prev(t)];
+        disk[t] - local[prev(t)]*asked_disk[prev(t)]
+            + local[prev(t)]*frees_disk[prev(t)];
 
 subject to choose_one_option {t in timestamps}:
     federate[t] + local[t] + reject[t] = 1;
