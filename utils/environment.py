@@ -125,17 +125,8 @@ class Env:
         # FEDERATION
         elif action == 1:
             if float(self.time) <= float(arrival_time):
-                k = float(self.capacity[0]-self.cpu)/self.capacity[0]
-                l = float(self.capacity[1]-self.memory)/self.capacity[1]
-                m = float(self.capacity[2]-self.disk)/self.capacity[2]
-
-                coeff = k+l+m
-                print("Coeff:", coeff)
-                # coeff = np.random.uniform(0,service_profit)
-                now_profit = service_profit*coeff if coeff > 0 else (-5*service_profit)
-                #now_profit = random.randrange(1, 2)
-                now_profit = 1
-                return now_profit
+                return 0
+                # TODO return -math.inf to not have federation
         # local deploy
         else:
             if action == 0 and self.enough_resources(service_cpu,
@@ -186,9 +177,11 @@ class Env:
                 # print("New service added")
                 return [self.cpu, self.memory, self.disk, service_profit]
             else:
-                print("penalty!")
-                self.profit -= (1.2*service_profit)
-                return [self.cpu, self.memory, self.disk, (-1*service_profit)]
+                # TODO: reflect outside that chosen action was to 'federate'
+                print("federate!")
+                now_profit = 1
+                self.profit += now_profit
+                return [self.cpu, self.memory, self.disk, now_profit]
 
     def get_num_services(self):
         return int(len(self.service_length))

@@ -4,12 +4,12 @@ import argparse
 import json
 from environment import Env
 from matplotlib import pyplot as plt
+import math
 
 
 def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
         big_profits, small_cpus, small_disks, small_mems, small_times,
-        small_lifes, small_profits, domain_cpu, domain_disk, domain_mem):
-    #
+        small_lifes, small_profits):
 
     i, j = -1, -1
     current_time = 0
@@ -22,10 +22,11 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
     env_capacity = []
     rewards = []
     total_profit = 0
+    greedy_actions = {0: 0, 1: 0, 2:0}
 
     while True:
         if((i+1) >= len(small_time)):
-            return tot_profit
+            break
 
         # GET ARRIVAL INFORMATION
         if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
@@ -54,21 +55,25 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
         now_action = None
         for action in [0, 1, 2]:
             action_profit = env.action_profit(action, arrival_cpu, arrival_mem,
-                    arrival_disk, arrival_profit, arrival_time, arrival_length)
+                    arrival_disk, arrival_profit, current_time, arrival_length)
             if action_profit > now_profit:
                 now_action = action
                 now_profit = action_profit
+        greedy_actions[now_action] += 1
 
         action = now_action
         print("time:", current_time)
         print("action:", action)
-        actions.append(action)
         now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
         updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
         total_profit += now_profit
         print("Profit of step:", now_profit)
-        print("Profit total:", tot_profit+now_profit)
+        print("Profit total:", tot_profit)
         print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
+
+    print("Episode: greedy")
+    print("Rewards:", tot_profit)
+    print("Actions:", greedy_actions)
 
     return total_profit
 
@@ -154,10 +159,18 @@ if __name__ == '__main__':
     total_actions_episode = 0
     print(env.get_profit())
 
+    # Obtain the greedy solution
+    print('### GREEDY SOLUTION ###')
+    greedy_profit = greedy(env, big_cpus, big_disks, big_mems, big_time,
+            big_lifes, big_profits, small_cpus, small_disks, small_mems,
+            small_time, small_lifes, small_profits)
+
+    print('\n\n### Q-LEARNING SOLUTION ###')
     tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk)
     tot_actions = 3
     tot_profit = 0
     Q = np.zeros(shape=(tot_states, tot_actions), dtype=np.int)
+
     state = env.calculate_state()
     print("total_length:",tot_states)
     print("Q length: ",len(Q))
@@ -166,12 +179,13 @@ if __name__ == '__main__':
     print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
     print("Reverse calculate (state):", str(env.state_to_capacity(state)))
 
-    episodes= 50
+    episodes= 200
     episode_reward = []
     actions = []
     num_services = 0
 
     for episode in range(episodes):
+        env.reset()
         sim_active = True
 
         while True:
@@ -219,6 +233,7 @@ if __name__ == '__main__':
             # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
 
             Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
+            print('Q[{},{}]={}', state, action, Q[state,action])
             unique, counts = np.unique(actions, return_counts=True)
             total_actions_episode = dict(zip(unique, counts))
             rewards.append(tot_profit)
@@ -237,7 +252,9 @@ if __name__ == '__main__':
 
     x = np.arange(0, len(episode_reward), 1)
     fig, ax = plt.subplots()
-    ax.plot(x, episode_reward)
+    ax.plot(x, episode_reward, label='Q-learning')
+    ax.hlines(greedy_profit, xmin=x[0], xmax=x[-1], label='greedy')
+    plt.legend(loc='best')
     plt.show()
 
     # env_capacity = env.current_capacity()

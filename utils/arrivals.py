@@ -60,7 +60,7 @@ if __name__ == '__main__':
         small_disks += [math.ceil(abs(np.random.normal(config['smallResources']['disk_mean'])))]
         small_mems += [math.ceil(abs(np.random.normal(config['smallResources']['mem_mean'])))]
         small_lifes += [np.random.uniform(1.0, 4.0)]
-        small_profits += [np.random.uniform(1.0, 3.0)]
+        small_profits += [np.random.uniform(3.0, 5.0)]
 
 
     big_cpus, big_mems, big_disks, big_lifes, big_profits = [], [], [], [], []
