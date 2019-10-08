@@ -1,109 +1,9 @@
 #!/usr/bin/python3
 
-import networkx as nx
 from amplpy import AMPL, DataFrame
 import argparse
-
-import graphs.generate_service as gs
-
-AMPLInfraTypes = ['APs', 'servers', 'mobiles']
-
-# TODO: refactor the loading to a class to avoid parameter multiplication and/or global variables
-infra_type_sets = {itype: [] for itype in AMPLInfraTypes}
-
-def fill_service(ampl: AMPL, service: gs.ServiceGMLGraph) -> None:
-    ampl.param['vertices'][service.name] = service.vnfs
-    ampl.set['edges'][service.name] = [
-        (service.nodes[c1][service.node_name_str],
-            service[c2][service.node_name_str]) for c1,c2 in service.edges()]
-
-    # set the CPU demands
-    ampl.getParameter('demands').setValues({
-        vnf: props[service.node_name_str]
-        for vnf,props in service.nodes(data=True)
-    })
-
-
-def fill_infra(ampl: AMPL, infra: gs.InfrastructureGMLGraph) -> None:
-    # Get the infrastructure nodes' names
-    endpoint_names = [infra.nodes[id_][infra.node_name_str]
-        for id_ in infra.endpoint_ids]
-    access_point_names = [infra.nodes[id_][infra.node_name_str]
-        for id_ in infra.access_point_ids]
-    server_names = [infra.nodes[id_][infra.node_name_str]
-        for id_ in infra.server_ids]
-    mobile_names = [infra.nodes[id_][infra.node_name_str]
-        for id_ in infra.mobile_ids]
-    infra_names = endpoint_names + access_point_names + server_names +\
-            mobile_names
-
-    # All the infra graph vertices
-    ampl.set['vertices'][infra.name] = infra_names
-    ampl.set['APs'] = access_point_names
-    ampl.set['servers'] = server_names
-    ampl.set['mobiles'] = mobile_names
-
-    # Infrastructure edges
-    ampl.set['edges'][infra.name] = [(infra.nodes[c1][infra.node_name_str],
-        infra.nodes[c2][infra.node_name_str]) for c1,c2 in infra.edges()]
-    
-    # set the CPU capabilities
-    ampl.getParameter('resources').setValues({
-        props[infra.node_name_str]: props[infra.infra_node_capacity_str]
-        for node,props in infra.nodes(data=True)
-    })
-
-    # TODO: put the cost unit demand
-    ampl.getParameter('cost_unit_demand').setValues({
-        props[infra.node_name_str]: props[infra.infra_unit_cost_str]
-        for node,props in infra.nodes(data=True)
-    })
-
-    # fill the battery probability constraints
-    ampl.getParameter('max_used_battery').setValues({
-        mobile_node: infra.full_loaded_battery_alive_prob
-        for mobile_node in mobile_names
-    })
-    ampl.getParameter('min_used_battery').setValues({
-        mobile_node: infra.unloaded_battery_alive_prob
-        for mobile_node in mobile_names
-    })
-
-
-def fill_AP_coverage_probabilities(ampl: AMPL, interval_length: int) -> None:
-    subintervals = [i for i in range(1, interval_length + 1)]
-    APs = infra_type_sets[AMPLInfraTypes['APs']]
-    df = DataFrame(('AP_name', 'subinterval'), 'prob')
-    df.setValues({(AP, subint): 0.9 for AP in APs for subint in subintervals})
-    ampl.param['prob_AP'].setValues(df)
-    # TODO: refine this method to actually fill with the coverage prob
-
-
-def get_complete_ampl_model_data(ampl_model_path, service : gs.ServiceGMLGraph, infra : gs.InfrastructureGMLGraph) -> AMPL:
-    """
-    Reads all service and infrastructure information to AMPL python data structure
-
-    :param service:
-    :param infra:
-    :return:
-    """
-    ampl = AMPL()
-    ampl.read(ampl_model_path)
-    ampl.set['graph'] = [infra.name, service.name]
-    ampl.param['infraGraph'] = infra.name
-    ampl.param['serviceGraph'] = service.name
-
-    # interval_length 
-    ampl.param['interval_length'] = infra.time_interval_count
-
-    fill_AP_coverage_probabilities(ampl, interval_length)
-
-    # TODO @Jorge: continue from here on
-        # fill the affinity variable
-
-    fill_service(ampl, service)
-    fill_infra(ampl, infra)
-    return ampl
+import csv
+import json
 
 
 if __name__ == '__main__':
@@ -116,15 +16,100 @@ if __name__ == '__main__':
                         help='Path to the arrivals CSV file')
     parser.add_argument('out', metavar='out', type=str,
                         help='Path to the output where .dat is created')
-
     args = parser.parse_args()
 
-    # Fill our model data
+
+    # Create the AMPL object
     ampl = AMPL()
     ampl.read(args.model)
 
-    fill_service(ampl, service)
-    fill_infra(ampl, infra)
-    fill_AP_coverage_probabilities(ampl, args.interval_length)
+    # Read the arrivals
+    asked_cpu, asked_mem, asked_disk, asked_lifes = [], [], [], []
+    times, profit_federate, profit_local, profit_reject = [], [], [], []
+    leaves_cpu, leaves_mem, leaves_disk, leaves_time = [], [], [], []
+    with open(args.arrivals, 'r') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        next(reader, None)
+        for row in reader:
+            times += [float(row[2])]
+            asked_cpu += [float(row[3])]
+            asked_mem += [float(row[4])]
+            asked_disk += [float(row[5])]
+            asked_lifes += [float(row[6])]
+            profit_federate += [1]
+            profit_local += [float(row[7])]
+            profit_reject += [-float(row[7])]
+
+            # Include the leaving
+            leaves_time += [times[-1] + asked_lifes[-1]]
+            leaves_cpu += [asked_cpu[-1]]
+            leaves_mem += [asked_mem[-1]]
+            leaves_disk += [asked_disk[-1]]
+
+
+    # create the events dictionary
+    events = {}
+    for i in range(len(times)):
+        events[times[i]] = {
+            'profit_federate': profit_federate[i],
+            'profit_local': profit_local[i],
+            'profit_reject': profit_reject[i],
+            'asked_cpu': asked_cpu[i],
+            'asked_mem': asked_mem[i],
+            'asked_disk': asked_disk[i],
+            'frees_mem': 0,
+            'frees_cpu': 0,
+            'frees_disk': 0
+        }
+    for i in range(len(leaves_time)):
+        events[leaves_time[i]] = {
+            'profit_federate': 0,
+            'profit_local': 0,
+            'profit_reject': 0,
+            'asked_cpu': 0,
+            'asked_mem': 0,
+            'asked_disk': 0,
+            'frees_mem': leaves_mem[i],
+            'frees_cpu': leaves_cpu[i],
+            'frees_disk': leaves_disk[i]
+        }
+
+    # Set the ordered timestamps
+    timestamps = times + leaves_time
+    timestamps.sort()
+    ampl.set['timestamps'] = timestamps
+
+    # Set profits
+    df = DataFrame(('timestamps'), 'profit_federate')
+    df.setValues({t: events[t]['profit_federate'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'profit_local')
+    df.setValues({t: events[t]['profit_local'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'profit_reject')
+    df.setValues({t: events[t]['profit_reject'] for t in events.keys()})
+    ampl.setData(df)
+
+    # Set asked resources
+    df = DataFrame(('timestamps'), 'asked_cpu')
+    df.setValues({t: events[t]['asked_cpu'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'asked_mem')
+    df.setValues({t: events[t]['asked_mem'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'asked_disk')
+    df.setValues({t: events[t]['asked_disk'] for t in events.keys()})
+    ampl.setData(df)
+
+    # Set leavings
+    df = DataFrame(('timestamps'), 'frees_cpu')
+    df.setValues({t: events[t]['frees_cpu'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'frees_mem')
+    df.setValues({t: events[t]['frees_mem'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'frees_disk')
+    df.setValues({t: events[t]['frees_disk'] for t in events.keys()})
+    ampl.setData(df)
     ampl.exportData(datfile=args.out)
 

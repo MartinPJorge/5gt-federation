@@ -118,15 +118,15 @@ class Env:
 
 
     def action_profit(self, action, service_cpu, service_memory, service_disk,
-                      service_profit, arrival_time, service_length):
+                      service_profit, arrival_time, service_length,
+                      federate=True):
         # reject
         if action == 2:
             return -service_profit
         # FEDERATION
         elif action == 1:
             if float(self.time) <= float(arrival_time):
-                return 0
-                # TODO return -math.inf to not have federation
+                return 1 if federate else -math.inf
         # local deploy
         else:
             if action == 0 and self.enough_resources(service_cpu,

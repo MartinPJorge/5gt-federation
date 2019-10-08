@@ -3,13 +3,14 @@ import numpy as np
 import argparse
 import json
 from environment import Env
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 import math
 
 
 def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
         big_profits, small_cpus, small_disks, small_mems, small_times,
-        small_lifes, small_profits):
+        small_lifes, small_profits, federate=True):
 
     i, j = -1, -1
     current_time = 0
@@ -55,7 +56,8 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
         now_action = None
         for action in [0, 1, 2]:
             action_profit = env.action_profit(action, arrival_cpu, arrival_mem,
-                    arrival_disk, arrival_profit, current_time, arrival_length)
+                    arrival_disk, arrival_profit, current_time, arrival_length,
+                    federate)
             if action_profit > now_profit:
                 now_action = action
                 now_profit = action_profit
@@ -159,11 +161,17 @@ if __name__ == '__main__':
     total_actions_episode = 0
     print(env.get_profit())
 
-    # Obtain the greedy solution
-    print('### GREEDY SOLUTION ###')
-    greedy_profit = greedy(env, big_cpus, big_disks, big_mems, big_time,
+    # Obtain the greedy solution with federation
+    print('### GREEDY SOLUTION with federation ###')
+    greedy_profit_fed = greedy(env, big_cpus, big_disks, big_mems, big_time,
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
-            small_time, small_lifes, small_profits)
+            small_time, small_lifes, small_profits, federate=True)
+    # Obtain the greedy solution
+    print('### GREEDY SOLUTION without federation ###')
+    env.reset()
+    greedy_profit_no_fed = greedy(env, big_cpus, big_disks, big_mems, big_time,
+            big_lifes, big_profits, small_cpus, small_disks, small_mems,
+            small_time, small_lifes, small_profits, federate=False)
 
     print('\n\n### Q-LEARNING SOLUTION ###')
     tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk)
@@ -179,7 +187,7 @@ if __name__ == '__main__':
     print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
     print("Reverse calculate (state):", str(env.state_to_capacity(state)))
 
-    episodes= 200
+    episodes= 80
     episode_reward = []
     actions = []
     num_services = 0
@@ -245,16 +253,31 @@ if __name__ == '__main__':
 
 
 
-    x = np.arange(0, len(rewards), 1)
-    fig, ax = plt.subplots()
-    ax.plot(x, rewards)
-    plt.show()
+    # x = np.arange(0, len(rewards), 1)
+    # fig, ax = plt.subplots()
+    # ax.plot(x, rewards)
+    # plt.show()
+
+    opt_profit = 415.181517
+    max_profit = max(episode_reward)
+    max_profit = max(max_profit, greedy_profit_fed)
+    max_profit = max(max_profit, greedy_profit_no_fed)
+    max_profit = max(max_profit, opt_profit)
 
     x = np.arange(0, len(episode_reward), 1)
     fig, ax = plt.subplots()
-    ax.plot(x, episode_reward, label='Q-learning')
-    ax.hlines(greedy_profit, xmin=x[0], xmax=x[-1], label='greedy')
-    plt.legend(loc='best')
+    plt.grid(linestyle='--', linewidth=0.5)
+    plt.xlabel('episodes')
+    plt.ylabel('normalized episode profit')
+    plt.plot(x, [er/max_profit for er in episode_reward], label='Q-learning',
+            color='C0', linewidth=4)
+    plt.plot(x, [greedy_profit_fed/max_profit for _ in range(len(x))],
+            label='checker', color='C3', linestyle='dashdot', linewidth=4)
+    plt.plot(x, [greedy_profit_no_fed/max_profit for _ in range(len(x))],
+            label='no-federate', color='C1', linestyle='dashed', linewidth=4)
+    plt.plot(x, [opt_profit/max_profit for _ in range(len(x))], label='OPT', linestyle='dotted',
+            color='C2', linewidth=4)
+    plt.legend(loc='best', handlelength=4)
     plt.show()
 
     # env_capacity = env.current_capacity()
