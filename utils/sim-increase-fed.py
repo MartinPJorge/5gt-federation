@@ -6,176 +6,8 @@ from environment import Env
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import math
+import simulation as sim
 
-
-def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
-        big_profits, small_cpus, small_disks, small_mems, small_times,
-        small_lifes, small_profits, federate=True):
-
-    i, j = -1, -1
-    current_time = 0
-    i = -1
-    j = -1
-    arrival_cpu = 0
-    arrival_mem = 0
-    arrival_disk = 0
-    arrival_length = 0
-    env_capacity = []
-    rewards = []
-    total_profit = 0
-    greedy_actions = {0: 0, 1: 0, 2:0}
-
-    while True:
-        if((i+1) >= len(small_time)):
-            break
-
-        # GET ARRIVAL INFORMATION
-        if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
-            j += 1
-            current_time = float(big_time[j])
-            arrival_cpu = big_cpus[j]
-            arrival_mem = big_mems[j]
-            arrival_disk = big_disks[j]
-            arrival_profit = big_profits[j]
-            arrival_length = big_lifes[j]
-        else:
-            i += 1
-            current_time = float(small_time[i])
-            arrival_cpu = small_cpus[i]
-            arrival_mem = small_mems[i]
-            arrival_disk = small_disks[i]
-            arrival_profit = small_profits[i]
-            arrival_length = small_lifes[i]
-
-
-        # UPDATE ENVIRONMENT WITH LATEST TIME
-        state, tot_profit, num_services = env.update_domain(current_time)
-
-        # Choose greedily best current action
-        now_profit = -math.inf
-        now_action = None
-        for action in [0, 1, 2]:
-            action_profit = env.action_profit(action, arrival_cpu, arrival_mem,
-                    arrival_disk, arrival_profit, current_time, arrival_length,
-                    federate)
-            if action_profit > now_profit:
-                now_action = action
-                now_profit = action_profit
-        greedy_actions[now_action] += 1
-
-        action = now_action
-        print("time:", current_time)
-        print("action:", action)
-        now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
-        updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
-        total_profit += now_profit
-        print("Profit of step:", now_profit)
-        print("Profit total:", tot_profit)
-        print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
-
-    print("Episode: greedy")
-    print("Rewards:", tot_profit)
-    print("Actions:", greedy_actions)
-
-    return total_profit
-
-
-def q_learning(env, big_cpus, big_disks, big_mems, big_time,
-        big_lifes, big_profits, small_cpus, small_disks, small_mems,
-        small_time, small_lifes, small_profits, domain_cpu, domain_memory,
-        domain_disk, alpha, discount, episodes):
-    sim_active = True
-    i = -1
-    j = -1
-    print(i,j)
-    arrival_cpu = 0
-    arrival_mem = 0
-    arrival_disk = 0
-    arrival_length = 0
-    env_capacity = []
-    rewards = []
-    total_actions_episode = 0
-    print(env.get_profit())
-
-
-    print('\n\n### Q-LEARNING SOLUTION ###')
-    tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk)
-    tot_actions = 3
-    tot_profit = 0
-    Q = np.zeros(shape=(tot_states, tot_actions), dtype=np.int)
-
-    state = env.calculate_state()
-    print("total_length:",tot_states)
-    print("Q length: ",len(Q))
-    print("State:", str(env.calculate_state()))
-    print("Reverse calculate (state):", str(env.state_to_capacity(state)))
-    print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
-    print("Reverse calculate (state):", str(env.state_to_capacity(state)))
-
-    episode_reward = []
-    actions = []
-    num_services = 0
-
-    for episode in range(episodes):
-        env.reset()
-        sim_active = True
-
-        while True:
-            if((i+1) >= len(small_time)):
-                episode_reward.append(tot_profit)
-                i=-1
-                j=-1
-                env.reset()
-                sim_active = False
-                break
-
-    #   GET ARRIVAL INFORMATION
-            if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
-                j += 1
-                current_time = float(big_time[j])
-                arrival_cpu = big_cpus[j]
-                arrival_mem = big_mems[j]
-                arrival_disk = big_disks[j]
-                arrival_profit = big_profits[j]
-                arrival_length = big_lifes[j]
-            else:
-                i += 1
-                current_time = float(small_time[i])
-                arrival_cpu = small_cpus[i]
-                arrival_mem = small_mems[i]
-                arrival_disk = small_disks[i]
-                arrival_profit = small_profits[i]
-                arrival_length = small_lifes[i]
-
-
-            # UPDATE ENVIRONMENT WITH LATEST TIME
-            state, tot_profit, num_services = env.update_domain(current_time)
-
-            action = np.argmax(Q[state, :] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
-            print("time:", current_time)
-            print("action:", action)
-            actions.append(action)
-            now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
-            updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
-            print("Profit of step:", now_profit)
-            print("Profit total:", tot_profit+now_profit)
-            print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
-
-            # print("State", str(updated_state))
-            # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
-
-            Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
-            print('Q[{},{}]={}', state, action, Q[state,action])
-            unique, counts = np.unique(actions, return_counts=True)
-            total_actions_episode = dict(zip(unique, counts))
-            rewards.append(tot_profit)
-
-        print("Episode:", episode)
-        print("Rewards:", episode_reward[episode-1])
-        print("Actions:", total_actions_episode)
-        print("Num.Services:", num_services)
-
-    return episode_reward
 
 
 if __name__ == '__main__':
@@ -245,7 +77,18 @@ if __name__ == '__main__':
     current_time = 0
     alpha = 0.75
     discount = 0.80
-
+    sim_active = True
+    i = -1
+    j = -1
+    print(i,j)
+    arrival_cpu = 0
+    arrival_mem = 0
+    arrival_disk = 0
+    arrival_length = 0
+    env_capacity = []
+    rewards = []
+    total_actions_episode = 0
+    print(env.get_profit())
 
     # Obtain the greedy solution with federation
     print('### GREEDY SOLUTION with federation ###')
@@ -259,12 +102,84 @@ if __name__ == '__main__':
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
             small_time, small_lifes, small_profits, federate=False)
 
+    print('\n\n### Q-LEARNING SOLUTION ###')
+    tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk)
+    tot_actions = 3
+    tot_profit = 0
+    Q = np.zeros(shape=(tot_states, tot_actions), dtype=np.int)
+
+    state = env.calculate_state()
+    print("total_length:",tot_states)
+    print("Q length: ",len(Q))
+    print("State:", str(env.calculate_state()))
+    print("Reverse calculate (state):", str(env.state_to_capacity(state)))
+    print("TRIAL CAPACITY TO STATE [4,15,9] =", str(env.capacity_to_state(4,15,9)))
+    print("Reverse calculate (state):", str(env.state_to_capacity(state)))
 
     episodes= 80
-    episode_reward = q_learning(env, big_cpus, big_disks, big_mems, big_time,
-            big_lifes, big_profits, small_cpus, small_disks, small_mems,
-            small_time, small_lifes, small_profits, domain_cpu, domain_memory,
-            domain_disk, alpha, discount, episodes)
+    episode_reward = []
+    actions = []
+    num_services = 0
+
+    for episode in range(episodes):
+        env.reset()
+        sim_active = True
+
+        while True:
+            if((i+1) >= len(small_time)):
+                episode_reward.append(tot_profit)
+                i=-1
+                j=-1
+                env.reset()
+                sim_active = False
+                break
+
+    #   GET ARRIVAL INFORMATION
+            if((j+1) < len(big_time) and big_time[j+1]<small_time[i+1]):
+                j += 1
+                current_time = float(big_time[j])
+                arrival_cpu = big_cpus[j]
+                arrival_mem = big_mems[j]
+                arrival_disk = big_disks[j]
+                arrival_profit = big_profits[j]
+                arrival_length = big_lifes[j]
+            else:
+                i += 1
+                current_time = float(small_time[i])
+                arrival_cpu = small_cpus[i]
+                arrival_mem = small_mems[i]
+                arrival_disk = small_disks[i]
+                arrival_profit = small_profits[i]
+                arrival_length = small_lifes[i]
+
+
+            # UPDATE ENVIRONMENT WITH LATEST TIME
+            state, tot_profit, num_services = env.update_domain(current_time)
+
+            action = np.argmax(Q[state, :] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
+            print("time:", current_time)
+            print("action:", action)
+            actions.append(action)
+            now_cpu, now_memory, now_disk, now_profit = env.instantiate_service(action, arrival_cpu, arrival_mem, arrival_disk, arrival_profit, current_time, arrival_length)
+            updated_state = env.capacity_to_state(now_cpu, now_memory, now_disk)
+            print("Profit of step:", now_profit)
+            print("Profit total:", tot_profit+now_profit)
+            print("Capacity:", str(now_cpu), str(now_memory), str(now_disk), "\n")
+
+            # print("State", str(updated_state))
+            # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
+
+            Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
+            print('Q[{},{}]={}', state, action, Q[state,action])
+            unique, counts = np.unique(actions, return_counts=True)
+            total_actions_episode = dict(zip(unique, counts))
+            rewards.append(tot_profit)
+
+        print("Episode:", episode)
+        print("Rewards:", episode_reward[episode-1])
+        print("Actions:", total_actions_episode)
+        print("Num.Services:", num_services)
+
 
 
     # x = np.arange(0, len(rewards), 1)
