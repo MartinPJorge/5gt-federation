@@ -8,8 +8,11 @@ from matplotlib import pyplot as plt
 import math
 
 
-def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
-        big_profits, small_cpus, small_disks, small_mems, small_times,
+FIND_BEST_Q=False # runs all combinations of alpha and discount
+
+
+def greedy(env, big_cpus, big_disks, big_mems, big_time, big_lifes,
+        big_profits, small_cpus, small_disks, small_mems, small_time,
         small_lifes, small_profits, federate=True):
 
     i, j = -1, -1
@@ -58,6 +61,8 @@ def greedy(env, big_cpus, big_disks, big_mems, big_times, big_lifes,
             action_profit = env.action_profit(action, arrival_cpu, arrival_mem,
                     arrival_disk, arrival_profit, current_time, arrival_length,
                     federate)
+            print('action_profit={}, now_profit={}'.format(action_profit,
+                now_profit))
             if action_profit > now_profit:
                 now_action = action
                 now_profit = action_profit
@@ -261,10 +266,35 @@ if __name__ == '__main__':
 
 
     episodes= 80
+    alpha = 0.35
+    discount = 0.0
     episode_reward = q_learning(env, big_cpus, big_disks, big_mems, big_time,
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
             small_time, small_lifes, small_profits, domain_cpu, domain_memory,
             domain_disk, alpha, discount, episodes)
+
+    # Look for the best (alpha,discount) combination
+    if FIND_BEST_Q:
+        q_experiments = {}
+        for alpha_ in range(0, 105, 5):
+            for discount_ in range(0, 105, 5):
+                alpha = alpha_ / 100
+                discount = discount_ / 100
+                print('PAIR ({},{})'.format(alpha,discount))
+                episode_reward2 = q_learning(env, big_cpus, big_disks, big_mems, big_time,
+                        big_lifes, big_profits, small_cpus, small_disks, small_mems,
+                        small_time, small_lifes, small_profits, domain_cpu, domain_memory,
+                        domain_disk, alpha, discount, episodes)
+                q_experiments[(alpha,discount)] = episode_reward2[-1]
+        (best_alpha, best_discount) = [(k[0],k[1]) for (k,v) in
+                q_experiments.items() if v == max(q_experiments.values())][0]
+        print('best setup: alpha={},discount={}'.format(best_alpha, best_discount))
+        with open('alpha-discount-combinations.json', 'w') as outfile:
+            dump_dict = {}
+            for k in q_experiments.keys():
+                dump_dict[str(k)] = q_experiments[k]
+            json.dump(dump_dict, outfile)
+
 
 
     # x = np.arange(0, len(rewards), 1)
@@ -285,6 +315,8 @@ if __name__ == '__main__':
     plt.ylabel('normalized episode profit')
     plt.plot(x, [er/max_profit for er in episode_reward], label='Q-learning',
             color='C0', linewidth=4)
+    # plt.plot(x, [er/max_profit for er in episode_reward2], label='Q-learning2',
+    #         color='C5', linewidth=4)
     plt.plot(x, [greedy_profit_fed/max_profit for _ in range(len(x))],
             label='checker', color='C3', linestyle='dashdot', linewidth=4)
     plt.plot(x, [greedy_profit_no_fed/max_profit for _ in range(len(x))],
