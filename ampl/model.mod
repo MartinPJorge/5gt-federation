@@ -9,6 +9,8 @@ param asked_disk {timestamps};
 param frees_cpu {timestamps};
 param frees_mem {timestamps};
 param frees_disk {timestamps};
+param frees_arrival {timestamps}; # Arrival timestamp of leaving
+                                  # service
 
 var federate {timestamps} binary;
 var local {timestamps} binary;
@@ -19,13 +21,13 @@ var disk {timestamps};
 
 subject to match_cpu {t in timestamps: first(timestamps) <> t}:
         cpu[t] = cpu[prev(t)] - local[prev(t)]*asked_cpu[prev(t)]
-            + local[prev(t)]*frees_cpu[prev(t)];
+            + local[frees_arrival[prev(t)]]*frees_cpu[prev(t)];
 subject to match_mem {t in timestamps: first(timestamps) <> t}:
         mem[t] = mem[prev(t)] - local[prev(t)]*asked_mem[prev(t)]
-            + local[prev(t)]*frees_mem[prev(t)];
+            + local[frees_arrival[prev(t)]]*frees_mem[prev(t)];
 subject to match_disk {t in timestamps: first(timestamps) <> t}:
         disk[t] = disk[prev(t)] - local[prev(t)]*asked_disk[prev(t)]
-            + local[prev(t)]*frees_disk[prev(t)];
+            + local[frees_arrival[prev(t)]]*frees_disk[prev(t)];
 
 subject to choose_one_option {t in timestamps}:
     federate[t] + local[t] + reject[t] = 1;

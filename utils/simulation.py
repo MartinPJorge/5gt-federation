@@ -272,7 +272,7 @@ if __name__ == '__main__':
     # ax.plot(x, rewards)
     # plt.show()
 
-    opt_profit = 415.181517
+    opt_profit = 353.1591274
     max_profit = max(episode_reward)
     max_profit = max(max_profit, greedy_profit_fed)
     max_profit = max(max_profit, greedy_profit_no_fed)

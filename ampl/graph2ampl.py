@@ -27,6 +27,7 @@ if __name__ == '__main__':
     asked_cpu, asked_mem, asked_disk, asked_lifes = [], [], [], []
     times, profit_federate, profit_local, profit_reject = [], [], [], []
     leaves_cpu, leaves_mem, leaves_disk, leaves_time = [], [], [], []
+    leaves_arrival = []
     with open(args.arrivals, 'r') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         next(reader, None)
@@ -42,6 +43,7 @@ if __name__ == '__main__':
 
             # Include the leaving
             leaves_time += [times[-1] + asked_lifes[-1]]
+            leaves_arrival += [times[-1]]
             leaves_cpu += [asked_cpu[-1]]
             leaves_mem += [asked_mem[-1]]
             leaves_disk += [asked_disk[-1]]
@@ -59,7 +61,8 @@ if __name__ == '__main__':
             'asked_disk': asked_disk[i],
             'frees_mem': 0,
             'frees_cpu': 0,
-            'frees_disk': 0
+            'frees_disk': 0,
+            'frees_arrival': leaves_arrival[0]
         }
     for i in range(len(leaves_time)):
         events[leaves_time[i]] = {
@@ -71,7 +74,8 @@ if __name__ == '__main__':
             'asked_disk': 0,
             'frees_mem': leaves_mem[i],
             'frees_cpu': leaves_cpu[i],
-            'frees_disk': leaves_disk[i]
+            'frees_disk': leaves_disk[i],
+            'frees_arrival': leaves_arrival[i]
         }
 
     # Set the ordered timestamps
@@ -110,6 +114,9 @@ if __name__ == '__main__':
     ampl.setData(df)
     df = DataFrame(('timestamps'), 'frees_disk')
     df.setValues({t: events[t]['frees_disk'] for t in events.keys()})
+    ampl.setData(df)
+    df = DataFrame(('timestamps'), 'frees_arrival')
+    df.setValues({t: events[t]['frees_arrival'] for t in events.keys()})
     ampl.setData(df)
     ampl.exportData(datfile=args.out)
 
