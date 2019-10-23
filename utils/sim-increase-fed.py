@@ -6,11 +6,20 @@ from environment import Env
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import math
-from simulation import greedy
+from simulation import greedy, q_learning
 
 
 fed_multiplier = 2 # multiplier to increase federation resources
-fed_cpu_limit = 200 # limit of CPUs in federated domain
+fed_cpu_limit = 300 # limit of CPUs in federated domain
+multiplier_alphas = { # alpha parameters based on the multiplier
+    4: 1, # 0.34,
+    8: 1
+}
+multiplier_discounts = { # discount parameters based on the multiplier
+    4: 0.85, #0.0,
+    8: 0.85
+}
+
 
 
 if __name__ == '__main__':
@@ -90,6 +99,9 @@ if __name__ == '__main__':
     print("\tdisk: " + str(fed_domain_disk))
 
 
+    episodes= 200
+    alpha = 0.35
+    discount = 0.0
     env = Env(domain_cpu,domain_memory,domain_disk,fed_domain_cpu,
             fed_domain_memory, fed_domain_disk)
     env.print_status()
@@ -111,11 +123,9 @@ if __name__ == '__main__':
 
 
     # TODO
-    episodes= 80
-    alpha = 0.35
-    discount = 0.0
 
     print('### GREEDY SOLUTION without federation ###')
+    # Obtain the greedy solution
     env.reset()
     greedy_profit_no_fed = greedy(env, big_cpus, big_disks, big_mems, big_time,
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
@@ -123,17 +133,34 @@ if __name__ == '__main__':
 
     increase_profits = {}
     multiplier = 1
-    while fed_domain_cpu <= fed_cpu_limit:
+    last_lap = False
+    while fed_domain_cpu <= fed_cpu_limit or last_lap:
+        print('##### MULTIPLIER {}'.format(multiplier))
+        print('##### FED DOMAIN CPU {}'.format(fed_domain_cpu))
         print('multiplier: {}'.format(multiplier))
+        print('alpha={},ds={}'.format(alpha,discount))
+        print('federated_resources={}, local resources={}'.format(fed_domain_cpu,domain_cpu))
+
+        # set Q-learning parameters
+        if multiplier in multiplier_alphas:
+            print('ENTROOOOO')
+            alpha = multiplier_alphas[multiplier]
+            discount = multiplier_discounts[multiplier]
+        else:
+            alpha = 0.75
+            discount = 0.8
+        env = Env(domain_cpu,domain_memory,domain_disk,fed_domain_cpu,
+                fed_domain_memory, fed_domain_disk)
 
         # Obtain the greedy solution with federation
         print('### GREEDY SOLUTION with federation ###')
+        env.reset()
         greedy_profit_fed = greedy(env, big_cpus, big_disks, big_mems, big_time,
                 big_lifes, big_profits, small_cpus, small_disks, small_mems,
                 small_time, small_lifes, small_profits, federate=True)
-        # Obtain the greedy solution
 
         # Q-LEARNING
+        env.reset()
         episode_reward = q_learning(env, big_cpus, big_disks, big_mems, big_time,
                 big_lifes, big_profits, small_cpus, small_disks, small_mems,
                 small_time, small_lifes, small_profits, domain_cpu, domain_memory,
@@ -146,14 +173,31 @@ if __name__ == '__main__':
             'q-learning': episode_reward[-1]
         }
 
+
+        multiplier *= fed_multiplier
+        fed_domain_cpu = multiplier * domain_cpu
+        fed_domain_disk = multiplier * domain_disk
+        fed_domain_memory = multiplier * domain_memory
+
+        if last_lap: # quit the loop
+            break
+        elif fed_domain_cpu > fed_cpu_limit: # infty on last lap
+            last_lap = True
+            multiplier = math.inf
+            fed_domain_cpu = math.inf
+            fed_domain_disk = math.inf
+            fed_domain_memory = math.inf
+            
         # Environment doubles federation resources
-        fed_domain_cpu *= fed_multiplier
-        fed_domain_disk *= fed_multiplier
-        fed_domain_memory *= fed_multiplier
         env = Env(domain_cpu,domain_memory,domain_disk,fed_domain_cpu,
                 fed_domain_memory, fed_domain_disk)
+
 
 
     # Dump the results to a JSON file
     with open(args.outJSON, 'w') as outfile:
         json.dump(increase_profits, outfile)
+
+
+    
+

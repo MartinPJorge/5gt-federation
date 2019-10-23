@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import math
 
 
-FIND_BEST_Q=True # runs all combinations of alpha and discount
+FIND_BEST_Q=False # runs all combinations of alpha and discount
 FEDERATED=True # federated domain to find best combinations in Q-learning
 FEDERATED_MULTIPLIER=8 # federated_res=xFEDERATED_MULTIPLIER*local_res
 BEST_FILE='/tmp/alpha-combs-x8.json' # file to store best combs
@@ -325,7 +325,7 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
     plt.grid(linestyle='--', linewidth=0.5)
     plt.xlabel('episodes')
-    plt.ylabel('normalized episode profit')
+    plt.ylabel('$\\frac{r}{r_{OPT}}$', fontsize=16)
     plt.plot(x, [er/max_profit for er in episode_reward], label='Q-learning',
             color='C0', linewidth=4)
     # plt.plot(x, [er/max_profit for er in episode_reward2], label='Q-learning2',
