@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import math
 
 
+
 FIND_BEST_Q=False # runs all combinations of alpha and discount
 
 
@@ -297,7 +298,7 @@ if __name__ == '__main__':
 
 
 
-    # x = np.arange(0, len(rewards), 1)
+    # x = np.arange(0, len(rewards), 1)sud
     # fig, ax = plt.subplots()
     # ax.plot(x, rewards)
     # plt.show()
@@ -324,6 +325,9 @@ if __name__ == '__main__':
     plt.plot(x, [opt_profit/max_profit for _ in range(len(x))], label='OPT', linestyle='dotted',
             color='C2', linewidth=4)
     plt.legend(loc='best', handlelength=4)
+    filename = "../../results/result.png"
+    # os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
     plt.show()
 
     # env_capacity = env.current_capacity()
