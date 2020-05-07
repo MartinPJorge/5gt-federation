@@ -244,13 +244,19 @@ if __name__ == '__main__':
     domain_disk = int(domain_config["disk"])
     domain_memory = int(domain_config["mem"])
 
+    multiply_factor = int(2)
+
+    f_domain_cpu = int(domain_cpu)*multiply_factor
+    f_domain_disk = int(domain_disk)*multiply_factor
+    f_domain_memory = int(domain_memory)*multiply_factor
+
     print("Domain:")
     print("\tcpu: " + str(domain_cpu))
     print("\tmemory: " + str(domain_memory))
     print("\tdisk: " + str(domain_disk))
 
-
-    env = Env(domain_cpu,domain_memory,domain_disk)
+    env = Env(domain_cpu,domain_memory,domain_disk, f_domain_cpu, f_domain_memory, f_domain_disk)
+    # env = Env(domain_cpu,domain_memory,domain_disk)
     env.print_status()
     current_time = 0
     alpha = 0.75
@@ -321,6 +327,11 @@ if __name__ == '__main__':
     max_profit = max(max_profit, greedy_profit_no_fed)
     max_profit = max(max_profit, opt_profit)
 
+    print("--------------- MAXIMUM PROFITS ---------------")
+    print("\tGreedy No-federation: ", greedy_profit_no_fed)
+    print("\tGreedy Federation: ", greedy_profit_fed)
+    print("\tQ learning Federation: ", max(episode_reward))
+
     x = np.arange(0, len(episode_reward), 1)
     fig, ax = plt.subplots()
     plt.grid(linestyle='--', linewidth=0.5)
@@ -337,6 +348,11 @@ if __name__ == '__main__':
     plt.plot(x, [opt_profit/max_profit for _ in range(len(x))], label='OPT', linestyle='dotted',
             color='C2', linewidth=4)
     plt.legend(loc='best', handlelength=4)
+    
+    filename = "../../results/result.png"
+    # os.makedirs(os.path.dirname(filename), exist_ok=True)
+    plt.savefig(filename)
+
     plt.show()
 
     # env_capacity = env.current_capacity()
