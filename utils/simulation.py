@@ -8,8 +8,10 @@ from matplotlib import pyplot as plt
 import math
 
 
-
 FIND_BEST_Q=False # runs all combinations of alpha and discount
+FEDERATED=True # federated domain to find best combinations in Q-learning
+FEDERATED_MULTIPLIER=8 # federated_res=xFEDERATED_MULTIPLIER*local_res
+BEST_FILE='/tmp/alpha-combs-x8.json' # file to store best combs
 
 
 def greedy(env, big_cpus, big_disks, big_mems, big_time, big_lifes,
@@ -89,8 +91,7 @@ def greedy(env, big_cpus, big_disks, big_mems, big_time, big_lifes,
 def q_learning(env, big_cpus, big_disks, big_mems, big_time,
         big_lifes, big_profits, small_cpus, small_disks, small_mems,
         small_time, small_lifes, small_profits, domain_cpu, domain_memory,
-        domain_disk, f_domain_cpu, f_domain_memory,
-        f_domain_disk, alpha, discount, episodes):
+        domain_disk, alpha, discount, episodes):
     sim_active = True
     i = -1
     j = -1
@@ -106,8 +107,7 @@ def q_learning(env, big_cpus, big_disks, big_mems, big_time,
 
 
     print('\n\n### Q-LEARNING SOLUTION ###')
-    f_states = int((f_domain_cpu*f_domain_memory*f_domain_disk) + (f_domain_memory*f_domain_disk) + f_domain_disk)
-    tot_states = int((domain_cpu*domain_memory*domain_disk) + (domain_memory*domain_disk) + domain_disk + f_states)
+    tot_states = env.get_tot_states()
     tot_actions = 3
     tot_profit = 0
     Q = np.zeros(shape=(tot_states, tot_actions), dtype=np.int)
@@ -172,6 +172,8 @@ def q_learning(env, big_cpus, big_disks, big_mems, big_time,
             # print("State", str(updated_state))
             # print("Reverse calculate (state):", str(env.state_to_capacity(updated_state)), "\n")
 
+            print('state={}, action={}, updated_state={}'.format(state,
+                action, updated_state))
             Q[state, action] += alpha * (now_profit + discount * np.max(Q[updated_state, :]) - Q[state, action])
             print('Q[{},{}]={}', state, action, Q[state,action])
             unique, counts = np.unique(actions, return_counts=True)
@@ -242,21 +244,13 @@ if __name__ == '__main__':
     domain_disk = int(domain_config["disk"])
     domain_memory = int(domain_config["mem"])
 
-    multiply_factor = int(2)
-
-    f_domain_cpu = int(domain_cpu)*multiply_factor
-    f_domain_disk = int(domain_disk)*multiply_factor
-    f_domain_memory = int(domain_memory)*multiply_factor
-
-
     print("Domain:")
     print("\tcpu: " + str(domain_cpu))
     print("\tmemory: " + str(domain_memory))
     print("\tdisk: " + str(domain_disk))
 
 
-    # env = Env(domain_cpu,domain_memory,domain_disk)
-    env = Env(domain_cpu,domain_memory,domain_disk, f_domain_cpu, f_domain_memory, f_domain_disk)
+    env = Env(domain_cpu,domain_memory,domain_disk)
     env.print_status()
     current_time = 0
     alpha = 0.75
@@ -275,17 +269,22 @@ if __name__ == '__main__':
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
             small_time, small_lifes, small_profits, federate=False)
 
-    env.reset()
-    print("FEDERATION CAPACITY:",env.f_capacity)
-    print("STATUS:",env.calculate_state())
+
     episodes= 80
     alpha = 0.35
     discount = 0.0
     episode_reward = q_learning(env, big_cpus, big_disks, big_mems, big_time,
             big_lifes, big_profits, small_cpus, small_disks, small_mems,
             small_time, small_lifes, small_profits, domain_cpu, domain_memory,
-            domain_disk, f_domain_cpu, f_domain_memory,
-            f_domain_disk, alpha, discount, episodes)
+            domain_disk, alpha, discount, episodes)
+
+
+    # If find best is with a federated setup
+    if FEDERATED:
+        env = Env(domain_cpu,domain_memory,domain_disk,
+                domain_cpu*FEDERATED_MULTIPLIER,
+                domain_memory*FEDERATED_MULTIPLIER,
+                domain_disk*FEDERATED_MULTIPLIER)
 
     # Look for the best (alpha,discount) combination
     if FIND_BEST_Q:
@@ -303,7 +302,7 @@ if __name__ == '__main__':
         (best_alpha, best_discount) = [(k[0],k[1]) for (k,v) in
                 q_experiments.items() if v == max(q_experiments.values())][0]
         print('best setup: alpha={},discount={}'.format(best_alpha, best_discount))
-        with open('alpha-discount-combinations.json', 'w') as outfile:
+        with open(BEST_FILE, 'w') as outfile:
             dump_dict = {}
             for k in q_experiments.keys():
                 dump_dict[str(k)] = q_experiments[k]
@@ -311,7 +310,7 @@ if __name__ == '__main__':
 
 
 
-    # x = np.arange(0, len(rewards), 1)sud
+    # x = np.arange(0, len(rewards), 1)
     # fig, ax = plt.subplots()
     # ax.plot(x, rewards)
     # plt.show()
@@ -322,11 +321,6 @@ if __name__ == '__main__':
     max_profit = max(max_profit, greedy_profit_no_fed)
     max_profit = max(max_profit, opt_profit)
 
-    print("--------------- MAXIMUM PROFITS ---------------")
-    print("\tGreedy No-federation: ", greedy_profit_no_fed)
-    print("\tGreedy Federation: ", greedy_profit_fed)
-    print("\tQ learning Federation: ", max(episode_reward))
-
     x = np.arange(0, len(episode_reward), 1)
     fig, ax = plt.subplots()
     plt.grid(linestyle='--', linewidth=0.5)
@@ -336,13 +330,13 @@ if __name__ == '__main__':
             color='C0', linewidth=4)
     # plt.plot(x, [er/max_profit for er in episode_reward2], label='Q-learning2',
     #         color='C5', linewidth=4)
-    plt.plot(x, [greedy_profit_fed/max_profit for _ in range(len(x))], label='checker', color='C3', linestyle='dashdot', linewidth=4)
-    plt.plot(x, [greedy_profit_no_fed/max_profit for _ in range(len(x))], label='no-federate', color='C1', linestyle='dashed', linewidth=4)
-    plt.plot(x, [opt_profit/max_profit for _ in range(len(x))], label='OPT', linestyle='dotted',color='C2', linewidth=4)
+    plt.plot(x, [greedy_profit_fed/max_profit for _ in range(len(x))],
+            label='checker', color='C3', linestyle='dashdot', linewidth=4)
+    plt.plot(x, [greedy_profit_no_fed/max_profit for _ in range(len(x))],
+            label='no-federate', color='C1', linestyle='dashed', linewidth=4)
+    plt.plot(x, [opt_profit/max_profit for _ in range(len(x))], label='OPT', linestyle='dotted',
+            color='C2', linewidth=4)
     plt.legend(loc='best', handlelength=4)
-    filename = "../../results/result.png"
-    # os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt.savefig(filename)
     plt.show()
 
     # env_capacity = env.current_capacity()

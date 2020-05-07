@@ -69,6 +69,16 @@ class Env:
                     (self.f_memory*self.f_capacity[2]) + (self.f_disk-1))
         return int((cpu*self.capacity[1]*self.capacity[2]) + (memory*self.capacity[2]) + (disk-1) + f_state)
 
+    def get_tot_states(self):
+        tot_states = int((self.capacity[0] * self.capacity[1] * self.capacity[2]) +
+                (self.capacity[1]*self.capacity[2]) + self.capacity[2])
+        if self.f_cpu != math.inf:
+            f_states = int((self.f_capacity[0] * self.f_capacity[1] *
+                self.f_capacity[2]) + (self.f_capacity[1]*self.f_capacity[2]) +
+                self.f_capacity[2])
+            tot_states += f_states
+        return tot_states
+
     # TODO: refactor function to work with limited federation resources
     def state_to_capacity(self, state):
         state = int(state+1)
@@ -95,17 +105,11 @@ class Env:
         return [value_cpu, value_memory, value_disk]
 
     def print_status(self):
-        print("Environment status:")
+        print("Environment status:\n")
         print("\tCPU: " + str(self.cpu))
         print("\tDisk: " + str(self.disk))
         print("\tMemory: " + str(self.memory))
-        
-        print("\n\tFederated domain status:")
-        print("\tCPU: " + str(self.f_cpu))
-        print("\tDisk: " + str(self.f_disk))
-        print("\tMemory: " + str(self.f_memory))
-
-        print("\n\tTime: " + str(self.time) + " seconds")
+        print("\tTime: " + str(self.time) + " seconds")
         print("\tProfit: " + str(self.profit))
         print("\tNumber of Services: "+ str(len(self.service_length)))
 
@@ -170,16 +174,12 @@ class Env:
         if action == 2:
             return -service_profit
         # FEDERATION
-        elif action == 1:
-            print("tuka 1")
-            print(service_cpu, service_memory, service_disk)
-            if float(self.time) <= float(arrival_time) and\
+        elif action == 1 and not federate:
+            return -math.inf
+        elif action == 1 and  float(self.time) <= float(arrival_time) and\
                     self.enough_federated_resources(service_cpu, service_memory,
                         service_disk):
-                print("tuka 2")
-                return 1 if federate else -math.inf
-            else:
-                return -service_profit
+                return 1
         # local deploy
         else:
             if action == 0 and self.enough_resources(service_cpu,
@@ -253,4 +253,8 @@ class Env:
 
     def get_profit(self):
         return float(self.profit)
+
+    def get_fed_capacities(self):
+        return self.f_capacity
+
 
