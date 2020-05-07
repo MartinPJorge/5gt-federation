@@ -65,9 +65,9 @@ if __name__ == '__main__':
     small_cpus, small_mems, small_disks, small_lifes = [], [], [], []
     small_profits = []
     for _ in arrivals:
-        small_cpus += [math.ceil(abs(np.random.normal(2)))]
-        small_disks += [math.ceil(abs(np.random.normal(1024)))]
-        small_mems += [math.ceil(abs(np.random.normal(8)))]
+        small_cpus += [math.ceil(abs(np.random.normal(1)))]
+        small_disks += [math.ceil(abs(np.random.normal(20)))]
+        small_mems += [math.ceil(abs(np.random.normal(4)))]
         small_lifes += [args.l]
         small_profits += [args.p]
 

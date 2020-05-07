@@ -95,11 +95,17 @@ class Env:
         return [value_cpu, value_memory, value_disk]
 
     def print_status(self):
-        print("Environment status:\n")
+        print("Environment status:")
         print("\tCPU: " + str(self.cpu))
         print("\tDisk: " + str(self.disk))
         print("\tMemory: " + str(self.memory))
-        print("\tTime: " + str(self.time) + " seconds")
+        
+        print("\n\tFederated domain status:")
+        print("\tCPU: " + str(self.f_cpu))
+        print("\tDisk: " + str(self.f_disk))
+        print("\tMemory: " + str(self.f_memory))
+
+        print("\n\tTime: " + str(self.time) + " seconds")
         print("\tProfit: " + str(self.profit))
         print("\tNumber of Services: "+ str(len(self.service_length)))
 
@@ -165,10 +171,15 @@ class Env:
             return -service_profit
         # FEDERATION
         elif action == 1:
+            print("tuka 1")
+            print(service_cpu, service_memory, service_disk)
             if float(self.time) <= float(arrival_time) and\
                     self.enough_federated_resources(service_cpu, service_memory,
                         service_disk):
+                print("tuka 2")
                 return 1 if federate else -math.inf
+            else:
+                return -service_profit
         # local deploy
         else:
             if action == 0 and self.enough_resources(service_cpu,
