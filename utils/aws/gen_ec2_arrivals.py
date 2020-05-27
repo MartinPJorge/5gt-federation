@@ -8,6 +8,8 @@ import matplotlib.dates as mdates
 from matplotlib.dates import DateFormatter
 import matplotlib.units as munits
 import sys
+from scipy.stats import truncnorm
+from numpy.random import exponential as rexp
 
 
 
@@ -34,7 +36,6 @@ def gDeparture(p, k=2, a=2, b=0.5):
 
 
 
-
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Generate EC2 arrivals')
@@ -46,14 +47,10 @@ if __name__ == '__main__':
                         help='|-separated list of instances: ' +\
                             't3a.nano|t3a.small|...\n' +\
                             'or * wildcard to plot all')
+    parser.add_argument('lf_std', type=int,
+                        help='lifetime in lifetime+-lf_std/100')
     parser.add_argument('out', type=str, default='/tmp/ec2-arrivals.csv',
                         help='Path of the CSV where EC2 arrivals are stored')
-    parser.add_argument('--fk', default=2, help='k value for arrival rate f()')
-    parser.add_argument('--fa', default=2, help='a value for arrival rate f()')
-    parser.add_argument('--fb', default=0.5, help='b value for arrival rate f()')
-    parser.add_argument('--gk', default=2, help='k value for departure rate g()')
-    parser.add_argument('--ga', default=2, help='a value for departure rate g()')
-    parser.add_argument('--gb', default=0.5, help='b value for departure rate g()')
     args = parser.parse_args()
 
 
@@ -71,7 +68,6 @@ if __name__ == '__main__':
     # Filter the asked instances
     prices_df = prices_df[prices_df['InstanceType'].isin(instances)]
 
-
     
     #############################
     # OBTAIN AVG. PRICE PER DAY #
@@ -81,10 +77,60 @@ if __name__ == '__main__':
     avg_prices_df = prices_df.groupby(['Timestamp',
                                        'InstanceType'])['SpotPrice'].mean()\
                                      .reset_index()
+    avg_prices_df = avg_prices_df.rename(columns={"SpotPrice": "AvgSpotPrice"})
 
-    print(avg_prices_df[avg_prices_df['InstanceType']=='c5.metal'].head())
-    # TODO: now avg_prices_df have [Time, instance-type, avg spot price]
-    #       next is to generate the arrival rate
+
+    ###################################
+    # GENERATE THE INSTANCES ARRIVALS # 
+    ###################################
+    arrivals = {
+        'time': [],
+        'instance': [],
+        'spotprice': [],
+        'lifetime': [],
+        'cpu': [],
+        'memory': [],
+        'disk': [],
+        'reward': []
+    }
+
+    # Get maximum spot prices
+    max_spot_price = {
+        instance: avg_prices_df[avg_prices_df['InstanceType'] ==\
+                       instance]['AvgSpotPrice'].max()
+        for instance in avg_prices_df['InstanceType'].unique()
+    }
+
+    print('Generating the time arrivals')
+    for idx, row in avg_prices_df.iterrows():
+        instance_info = instances_info[row['InstanceType']]
+        arrival_rate = fArrival(p=row['AvgSpotPrice'] /\
+                                    max_spot_price[row['InstanceType']],
+                                k=instance_info['fk'], a=instance_info['fa'],
+                                b=instance_info['fb'])
+        i, epoch = 0, row['Timestamp'].timestamp()
+        while i < int(arrival_rate): # e.g. i < 3 instances/that-day
+            epoch += rexp(scale=1/arrival_rate)*24*60*60
+            lifetime = truncnorm.rvs(size=1,
+                    a=instance_info['lifetime']-args.lf_std/100,
+                    b=instance_info['lifetime']+args.lf_std/100)[0]
+            i += 1
+            arrivals['time'].append(epoch)
+            arrivals['instance'].append(row['InstanceType'])
+            arrivals['spotprice'].append(row['AvgSpotPrice'])
+            arrivals['lifetime'].append(lifetime)
+            arrivals['cpu'].append(instance_info['cpu'])
+            arrivals['memory'].append(instance_info['memory'])
+            arrivals['disk'].append(instance_info['disk'])
+            arrivals['reward'].append(100) # TODO: fix this reward
+
+
+    ############################################################
+    # Sort the arrivals by their arrival time and store in CSV #
+    ############################################################
+    arrivals_df = pd.DataFrame(data=arrivals)
+    arrivals_df.sort_values(by='time', inplace=True)
+    arrivals_df.to_csv(args.out, index=False)
 
 
 
