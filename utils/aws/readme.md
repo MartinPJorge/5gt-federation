@@ -10,10 +10,11 @@ aws ec2 describe-spot-price-history  --start-time 2020-03-01 --end-time 2020-05-
 ```
 then that file is fed to the 1st script of the pipeline.
 
-[aws scripts pipeline](./pipeline.png)
+<img src="./pipeline.png"/>
 
 
 ## References
 [1] Xu, Hong, and Baochun Li. "Dynamic cloud pricing for revenue maximization." IEEE Transactions on Cloud Computing 1.2 (2013): 158-171.
+
 [2] Information Exchange to Support Multi-Domain Slice Service Provision for 5G/NFV
 
