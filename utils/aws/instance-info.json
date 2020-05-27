@@ -1,0 +1,624 @@
+{
+    "comment": [
+        "This JSON contains the prices reported by AWS the 26/05/2020",
+        "https://aws.amazon.com/es/ec2/instance-types/"
+    ],
+    "a1.medium": {
+        "cpu": 1,
+        "memory": 2,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "a1.large": {
+        "cpu": 2,
+        "memory": 4,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "a1.xlarge": {
+        "cpu": 4,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "a1.2xlarge":{
+        "cpu": 8,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "a1.4xlarge":{
+        "cpu": 16,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "a1.metal":{
+        "cpu": 16,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 10
+    },
+    "t3.nano": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 6,
+        "memory": 0.5,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.micro": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 12,
+        "memory": 1,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.small": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 24,
+        "memory": 2,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.medium": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 24,
+        "memory": 4,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.large": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 36,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.xlarge": {
+        "cpu": 4,
+        "credit_per_hour_of_cpu": 96,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3.2xlarge": {
+        "cpu": 8,
+        "credit_per_hour_of_cpu": 192,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.nano": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 6,
+        "memory": 0.5,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.micro": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 12,
+        "memory": 1,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.small": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 24,
+        "memory": 2,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.medium": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 24,
+        "memory": 4,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.large": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 36,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.xlarge": {
+        "cpu": 4,
+        "credit_per_hour_of_cpu": 96,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t3a.2xlarge": {
+        "cpu": 8,
+        "credit_per_hour_of_cpu": 192,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 5
+    },
+    "t2.nano": {
+        "cpu": 1,
+        "credit_per_hour_of_cpu": 3,
+        "memory": 0.5,
+        "disk": "Solo EBS",
+        "Gbps": "low"
+    },
+    "t2.micro": {
+        "cpu": 1,
+        "credit_per_hour_of_cpu": 6,
+        "memory": 1,
+        "disk": "Solo EBS",
+        "Gbps": "low to moderate"
+    },
+    "t2.small": {
+        "cpu": 1,
+        "credit_per_hour_of_cpu": 12,
+        "memory": 2,
+        "disk": "Solo EBS",
+        "Gbps": "low to moderate"
+    },
+    "t2.medium": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 24,
+        "memory": 4,
+        "disk": "Solo EBS",
+        "Gbps": "low to moderate"
+    },
+    "t2.large": {
+        "cpu": 2,
+        "credit_per_hour_of_cpu": 36,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": "low to moderate"
+    },
+    "t2.xlarge": {
+        "cpu": 4,
+        "credit_per_hour_of_cpu": 54,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": "moderate"
+    },
+    "t2.2xlarge": {
+        "cpu": 8,
+        "credit_per_hour_of_cpu": 81,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": "moderate"
+    },
+    "m6g.medium": {
+        "cpu": 1,
+        "memory": 4,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m6g.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m6g.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m6g.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m6g.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMpbs": 4750
+    },
+    "m6g.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "Solo EBS",
+        "Gbps": 12,
+        "EBSMpbs": 9000
+    },
+    "m6g.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "Solo EBS",
+        "Gbps": 20,
+        "EBSMpbs": 13500
+    },
+    "m6g.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMpbs": 18000
+    },
+    "m5.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gpbs": 10,
+        "EBSMbps": 4750
+    },
+    "m5.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gpbs": 10,
+        "EBSMbps": 4750
+    },
+    "m5.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gpbs": 10,
+        "EBSMbps": 4750
+    },
+    "m5.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "Solo EBS",
+        "Gpbs": 10,
+        "EBSMbps": 4750
+    },
+    "m5.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 6800
+    },
+    "m5.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 9500
+    },
+    "m5.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "Solo EBS",
+        "Gbps": 20,
+        "EBSMbps": 13600
+    },
+    "m5.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 19000
+    },
+    "m5.metal": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 19000
+    },
+    "m5d.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "1 x 75 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m5d.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "1 x 150 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m5d.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "1 x 300 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m5d.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "2 x 300 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m5d.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "2 x 600 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 6800
+    },
+    "m5d.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "2 x 900 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 9500
+    },
+    "m5d.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "4 × 600 SSD NVMe",
+        "Gbps": 20,
+        "EBSMbps": 13600
+    },
+    "m5d.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "4 x 900 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 19000
+    },
+    "m5d.metal": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "4 x 900 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 19000
+    },
+    "m5a.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5a.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5a.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5a.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5a.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 4750
+    },
+    "m5a.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "Solo EBS",
+        "Gbps": 10,
+        "EBSMbps": 6780
+    },
+    "m5a.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "Solo EBS",
+        "Gbps": 12,
+        "EBSMbps": 9500
+    },
+    "m5a.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "Solo EBS",
+        "Gbps": 20,
+        "EBSMbps": 13570
+    },
+    "m5ad.grande": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "1 x 75 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5ad.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "1 x 150 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5ad.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "1 x 300 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5ad.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "2 x 300 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 2880
+    },
+    "m5ad.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "2 x 900 SSD NVMe",
+        "Gbps": 10,
+        "EBSMbps": 6870
+    },
+    "m5ad.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "4 x 900 SSD NVMe",
+        "Gbps": 20,
+        "EBSMbps": 13570
+    },
+    "m5n.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5n.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5n.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5n.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5n.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "Solo EBS",
+        "Gbps": 25,
+        "EBSMbps": 6800
+    },
+    "m5n.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "Solo EBS",
+        "Gbps": 50,
+        "EBSMbps": 9500
+    },
+    "m5n.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "Solo EBS",
+        "Gbps": 75,
+        "EBSMbps": 13600
+    },
+    "m5n.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "Solo EBS",
+        "Gbps": 100,
+        "EBSMbps": 19000
+    },
+    "m5dn.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "1 x 75 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5dn.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "1 x 150 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5dn.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "1 x 300 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5dn.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "2 x 300 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 4750
+    },
+    "m5dn.8xlarge": {
+        "cpu": 32,
+        "memory": 128,
+        "disk": "2 x 600 SSD NVMe",
+        "Gbps": 25,
+        "EBSMbps": 6800
+    },
+    "m5dn.12xlarge": {
+        "cpu": 48,
+        "memory": 192,
+        "disk": "2 x 900 SSD NVMe",
+        "Gbps": 50,
+        "EBSMbps": 9500
+    },
+    "m5dn.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "4 × 600 SSD NVMe",
+        "Gbps": 75,
+        "EBSMbps": 13600
+    },
+    "m5dn.24xlarge": {
+        "cpu": 96,
+        "memory": 384,
+        "disk": "4 x 900 SSD NVMe",
+        "Gbps": 100,
+        "EBSMbps": 19000
+    },
+    "m4.large": {
+        "cpu": 2,
+        "memory": 8,
+        "disk": "Solo EBS",
+        "Gbps": 450,
+        "EBSMbps": "Moderado"
+    },
+    "m4.xlarge": {
+        "cpu": 4,
+        "memory": 16,
+        "disk": "Solo EBS",
+        "Gbps": 750,
+        "EBSMbps": "Alto"
+    },
+    "m4.2xlarge": {
+        "cpu": 8,
+        "memory": 32,
+        "disk": "Solo EBS",
+        "Gbps": 1000,
+        "EBSMbps": "Alto"
+    },
+    "m4.4xlarge": {
+        "cpu": 16,
+        "memory": 64,
+        "disk": "Solo EBS",
+        "Gbps": 2000,
+        "EBSMbps": "Alto"
+    },
+    "m4.10xlarge": {
+        "cpu": 40,
+        "memory": 160,
+        "disk": "Solo EBS",
+        "Gbps": 4000,
+        "EBSMbps": 10
+    },
+    "m4.16xlarge": {
+        "cpu": 64,
+        "memory": 256,
+        "disk": "Solo EBS",
+        "Gbps": 10000,
+        "EBSMbps": 25
+    }
+}
+
