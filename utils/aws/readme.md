@@ -10,8 +10,7 @@ aws ec2 describe-spot-price-history  --start-time 2020-03-01 --end-time 2020-05-
 ```
 then that file is fed to the 1st script of the pipeline.
 
-[aws scripts pipeline](./pipeline.svg)
-<img src="./pipeline.svg">
+[aws scripts pipeline](./pipeline.png)
 
 
 ## References
