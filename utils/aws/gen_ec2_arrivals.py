@@ -87,7 +87,7 @@ if __name__ == '__main__':
         'time': [],
         'instance': [],
         'spotprice': [],
-        'lifetime': [],
+        'lifetime': [], # expressed in days
         'cpu': [],
         'memory': [],
         'disk': [],
@@ -112,12 +112,13 @@ if __name__ == '__main__':
         while i < int(arrival_rate): # e.g. i < 3 instances/that-day
             epoch += rexp(scale=1/arrival_rate)*24*60*60
             lifetime = truncnorm.rvs(size=1,
-                    a=instance_info['lifetime']-args.lf_std/100,
-                    b=instance_info['lifetime']+args.lf_std/100)[0]
+                    a=instance_info['lifetime']*(1-args.lf_std/100),
+                    b=instance_info['lifetime']*(1+args.lf_std/100))[0]
             i += 1
             arrivals['time'].append(epoch)
             arrivals['instance'].append(row['InstanceType'])
             arrivals['spotprice'].append(row['AvgSpotPrice'])
+            arrivals['os'].append(row ['ProductDescription'])
             arrivals['lifetime'].append(lifetime)
             arrivals['cpu'].append(instance_info['cpu'])
             arrivals['memory'].append(instance_info['memory'])
