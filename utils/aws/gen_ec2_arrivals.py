@@ -74,9 +74,8 @@ if __name__ == '__main__':
     #############################
     prices_df['Timestamp'] = pd.to_datetime(prices_df['Timestamp'])\
                                .dt.floor('d')
-    avg_prices_df = prices_df.groupby(['Timestamp',
-                                       'InstanceType'])['SpotPrice'].mean()\
-                                     .reset_index()
+    avg_prices_df = prices_df.groupby(['Timestamp', 'InstanceType',
+        'ProductDescription'])['SpotPrice'].mean().reset_index()
     avg_prices_df = avg_prices_df.rename(columns={"SpotPrice": "AvgSpotPrice"})
 
 
@@ -88,6 +87,7 @@ if __name__ == '__main__':
         'instance': [],
         'spotprice': [],
         'lifetime': [], # expressed in days
+        'os': [],
         'cpu': [],
         'memory': [],
         'disk': [],
@@ -118,7 +118,7 @@ if __name__ == '__main__':
             arrivals['time'].append(epoch)
             arrivals['instance'].append(row['InstanceType'])
             arrivals['spotprice'].append(row['AvgSpotPrice'])
-            arrivals['os'].append(row ['ProductDescription'])
+            arrivals['os'].append(row['ProductDescription'])
             arrivals['lifetime'].append(lifetime)
             arrivals['cpu'].append(instance_info['cpu'])
             arrivals['memory'].append(instance_info['memory'])

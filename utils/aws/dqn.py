@@ -6,6 +6,13 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 import random
+import math
+
+
+
+# print("TensorFlow version: {}".format(tf.__version__))
+# print("Eager execution: {}".format(tf.executing_eagerly()))
+
 
 
 # ACTIONs macros
@@ -20,8 +27,7 @@ FUTURE = pd.Timestamp('2200-01-01 00:00:00+00:00')
 
 
 class AWS_env():
-    def __init__(self, cpu, memory, disk,
-                 f_cpu=math.inf, f_memory=math.inf, f_disk=math.inf,
+    def __init__(self, cpu, memory, disk, f_cpu, f_memory, f_disk,
                  arrivals, spot_prices):
         # arrivals: pandas DataFrame with columns
         #           ['time', 'instance', 'spotprice', 'cpu', 'memory',
@@ -65,7 +71,7 @@ class AWS_env():
                 self.f_cpu, self.f_disk, self.f_memory]
 
 
-    def take_action(self, a):
+    def take_action(self, action):
         # a={1,2,3} local deployment, federate, reject
         # returns the reward and next state
         # in case it is the last state, it returns None as state
@@ -82,15 +88,15 @@ class AWS_env():
 
         
         # Assign the resources based on the action
-        asked_cpu = self.arrivals.iloc[curr_idx]['cpu']
-        asked_memory = self.arrivals.iloc[curr_idx]['memory']
-        asked_disk = self.arrivals.iloc[curr_idx]['disk']
+        asked_cpu = self.arrivals.iloc[self.curr_idx]['cpu']
+        asked_memory = self.arrivals.iloc[self.curr_idx]['memory']
+        asked_disk = self.arrivals.iloc[self.curr_idx]['disk']
         if action == A_REJECT:
             pass
         elif action == A_LOCAL:
             if self.cpu < asked_cpu or self.memory < asked_memory or\
                     self.disk < asked_disk:
-                reward -= self.arrivals.iloc[curr_idx]['reward']
+                reward -= self.arrivals.iloc[self.curr_idx]['reward']
             else:
                 self.cpu -= asked_cpu
                 self.memory -= asked_memory
@@ -98,7 +104,7 @@ class AWS_env():
         elif action == A_FEDERATE:
             if self.f_cpu < asked_cpu or self.f_memory < asked_memory or\
                     self.f_disk < asked_disk:
-                reward -= self.arrivals.iloc[curr_idx]['reward']
+                reward -= self.arrivals.iloc[self.curr_idx]['reward']
             else:
                 self.f_cpu -= asked_cpu
                 self.f_memory -= asked_memory
@@ -209,17 +215,17 @@ class AWS_env():
 
 
 class ReplayMemory():
-    self.__init__(self, N):
+    def __init__(self, N):
         self.N = N
-        experience = [] # tuples [st , at, rt , st+1]
+        self.experience = [] # tuples [phi_t , at, rt , phi_t+1]
 
-    def add_experience(self, state, action, reward, next_state):
-        experience += [state, action, reward, next_state]
-        if len(experience) > self.N:
-            experience = experience[1:]
+    def add_experience(self, phi, action, reward, next_phi):
+        self.experience += [[phi, action, reward, next_phi]]
+        if len(self.experience) > self.N:
+            self.experience = self.experience[1:]
 
     def sample(self, num_experiences):
-        samples = experience
+        samples = list(self.experience)
         while len(samples) != num_experiences:
             del samples[random.randint(0, len(samples)-1)]
         return samples
@@ -234,18 +240,14 @@ def create_q_network(k):
     # and that gives the state representation.
     # Then it should give as output x3 Q-values, one per action:
     #
-    #                               --->  Q(state, accept)
-    #                              /
-    # (state) --->  NN   ------> Q(state, reject) 
-    #                              \
-    #                               ----> Q(state, federate)
+    # (state,action) --->  NN  ---> Q(state, action) 
     #
     # return: the tf.model for the NN
 
     model = keras.Sequential([
-        keras.layers.Flatten(input_shape=(k,6)),
+        keras.layers.InputLayer(input_shape=(k*6 + 1,)),
         keras.layers.Dense(128, activation='relu'),
-        keras.layers.Dense(3)
+        keras.layers.Dense(1)
     ])
 
     print('Just have created the NN, check below the TF summary')
@@ -255,26 +257,72 @@ def create_q_network(k):
 
 
 
-def atari_loss(model, next_phi, phi, reward, action, training):
+def atari_loss(model, transitions, training, k, gamma):
     # training=training is needed only if there are layers with different
     # behavior during training versus inference (e.g. Dropout).
     # loss function of Algorithm 1 in
     # "Playing Atari with Deep Reinforcement Learning"
     #
-    # next_phi: phi_j+1
-    # phi: phi_j
-    # reward: r_j
-    # action: action_j
-    y_ = model(x, training=training)
+    # transitions: [phi, action, reward, next_phi]
+    #   next_phi: phi_j+1
+    #   phi: phi_j
+    #   reward: r_j
+    #   action: action_j
+    #
+    # return: loss for the transition (phi , action , reward , next_phi)
+    #
 
-    rewards = model(next_phi) # the NN yields accept,reject,federate rewards
-    y = reward + gamma * max(rewards)
+    ins = []
+    labels = None
 
-    return tf.math.square(y, model(phi)[action])
+    # Get the maximum reward for next_phi
+    for phi, action, reward, next_phi in transitions:
+        rewards = [model(tf.reshape(tf.concat([next_phi, [a]], 0),
+                                    shape=(1,6*k+1)))\
+                   for a in ACTIONS]
+        max_reward = rewards[0]
+        for reward in rewards:
+            if reward < max_reward:
+                max_reward = reward
+
+        ins.append(phi + [action])
+
+        if labels == None:
+            labels = reward + gamma * max_reward
+        else:
+            labels = tf.concat([labels, reward + gamma * max_reward], 0)
+
+    # reshape the transitions to feed them into the Q-network model
+    ins = tf.constant(ins, shape=(len(transitions), k*6+1))
+    labels = tf.constant(labels, shape=(len(transitions), 1))
+    pred = model(ins)
+
+    return tf.keras.losses.MSE(y_true=labels, y_pred=pred)
 
 
 
-def train_q_network(model, k, epsilon, gamma, M, batch_size, env):
+def phi_(sequence, k):
+    # it flattens the sequence of last k states
+    # sequence: list of lists [[cpu,mem,disk,f_cpu,f_mem,f_disk],
+    #                          [cpu2,mem2,disk2,f_cpu2,f_mem2,f_disk2], ...]
+    flat = []
+    for state in sequence[-k:]:
+        flat += state
+    
+    return flat
+
+
+def cast(phi, action, k):
+    # casts the phi, action lists to TF matrix
+    # phi: list
+    # action: integer
+    #
+    # return tf tensor of shape (1, k*6+1)
+    return tf.reshape(tf.concat([phi, [action]], axis=0), shape=(k*6+1))
+
+
+
+def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
     # Implement the training specified in Algorithm 1 of
     # "Playing Atari with Deep Reinforcement Learning"
     #
@@ -283,38 +331,60 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, env):
     # the reported environment and repeats each episode M
     # times.
     #
+    # N: replay memory size
     # batch_size: batch size to compute gradient using replay
     #             memory
 
-    # TODO: it is necessary to have an environment slightly
-    #       different than the one in environment.py
 
-    # Note: you have to define a custom training loop and define as
-    #       loss function the one in Algorithm 1
-
-    phi = []
+    sequence = []
     curr_state, next_state = env.get_state(), env.get_state()
-    D = ReplayMemory()
-
+    D = ReplayMemory(N=N)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
 
     for episode in range(M):
-        phi = [curr_state for _ in range(k)]
+        sequence = [curr_state for _ in range(k)]
+        now_phi = phi_(sequence, k=k)
 
-        while next_state not None:
+        while next_state != None:
             # epsilon-greedy action selection
             action = 0
             if random.random() < epsilon:
-                action = ACTIONS[random.randint(0, len(ACTIONS))]
-            Q = model(phi)
-            action = Q.index(max(Q))
+                action = ACTIONS[random.randint(0, len(ACTIONS) - 1)]
+            else:
+                in__ = tf.reshape(tf.concat([now_phi, [action]],0), shape=(1, 6*k+1))
+                Qs = [model(in__) for action in ACTIONS]
+                #action = ACTIONS[tf.math.argmax(Qs)]
+                action = ACTIONS[Qs.index(max(Qs))]
 
-            # execute in the environment
+            # execute selected action in the environment
             reward, next_state = env.take_action(action)
-            next_phi = phi[1:] + [next_state]
+            sequence += [next_state]
+            next_phi = phi_(sequence, k=k)
+            D.add_experience(now_phi, action, reward, next_phi)
 
-            D.add_experience(curr_state, action, reward, next_state)
-            # TODO: from here on you have to D.sample() and perform
-            #       atari_loss over all samples to do gradient descend
+            # If replay memory is small, don't do gradient
+            if len(D) < batch_size:
+                now_phi = next_phi
+                continue
+
+            # Sample from experience replay, compute loss,
+            # and apply the gradient
+            with tf.GradientTape() as tape:
+                loss = atari_loss(model=model,
+                        transitions=D.sample(num_experiences=batch_size),
+                        training=True, k=k, gamma=gamma)
+                print(f'loss shape={loss.shape}')
+                print(f'loss type={type(loss)}')
+                print(f'loss={loss}')
+                print(f'mod-train-vars={model.trainable_variables}')
+                grads = tape.gradient(loss, model.trainable_variables)
+            print(f'grads={grads}')
+            optimizer.apply_gradients(zip(grads,
+                                          model.trainable_variables))
+
+            now_phi = next_phi
+            # TODO: one can record the progress
+
 
 
 
@@ -328,14 +398,22 @@ if __name__ == '__main__':
                         help='|-separated list of instances: ' +\
                             't3a.nano|t3a.small|...\n' +\
                             'or * wildcard to plot all')
-    parser.add_argument('k', type=int, help='size of history to represent' +\
-                                            'the state')
-    parser.add_argument('epsilon', type=float,
-                        help='epsilon-greedy for the off-policy')
-    parser.add_argument('gamma', type=float,
-                        help='discounted factor for the reward')
+    parser.add_argument('arrivals', type=str,
+                        help='path to CSV with arrivals dataframe')
+    parser.add_argument('domains', type=str,
+                        help='path to JSON with local|federated resources')
+    parser.add_argument('k', type=int,
+                        help='size of history to represent the state')
     parser.add_argument('train', type=bool, help='True|False')
-    parser.add_argument('out_weights', type=str, default='/tmp/weights',
+    # Training arguments
+    parser.add_argument('--epsilon', type=float,
+                        help='epsilon-greedy for the off-policy')
+    parser.add_argument('--gamma', type=float,
+                        help='discounted factor for the reward')
+    parser.add_argument('--M', type=int, help='number of episodes')
+    parser.add_argument('--N', type=int, help='replay memory size')
+    parser.add_argument('--batch', type=int, help='batch size')
+    parser.add_argument('--out_weights', type=str, default='/tmp/weights',
                         help='Path where the DQN weights are stored')
     args = parser.parse_args()
 
@@ -366,7 +444,29 @@ if __name__ == '__main__':
         # Filter the asked instances
         prices_df = prices_df[prices_df['InstanceType'].isin(instances)]
         prices_dfs.append(prices_df)
+
+
+    # Load domains JSON with their resources
+    with open(args.domains) as fp:
+        domain = json.load(fp)
     
+
+    print(f'k={args.k}')
+
+
+    #############
+    # START DQN #
+    #############
+    env = AWS_env(cpu=domain['local']['cpu'], memory=domain['local']['memory'],
+            disk=domain['local']['disk'], f_cpu=domain ['federated']['cpu'],
+            f_disk=domain['federated']['disk'],
+            f_memory=domain['federated']['memory'],
+            arrivals=pd.read_csv(args.arrivals),
+            spot_prices=prices_df)
+    model = create_q_network(k=args.k)
+    train_q_network(model=model, k=args.k, epsilon=args.epsilon,
+            gamma=args.gamma, M=args.M, batch_size=args.batch,
+            N=args.N, env=env)
 
 
 
