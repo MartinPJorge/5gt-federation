@@ -39,12 +39,12 @@ class AWS_env():
         #              ['AvailabilityZone', 'InstanceType',
         #               'ProductDescription', 'SpotPrice', 'Timestamp']
 
-        self.cpu = cpu
-        self.disk = disk
-        self.memory = memory
-        self.f_cpu = f_cpu
-        self.f_disk = f_disk
-        self.f_memory = f_memory
+        self.cpu, self.max_cpu = cpu, cpu
+        self.disk, self.max_disk = disk, disk
+        self.memory, self.max_memory = memory, memory
+        self.f_cpu, self.max_f_cpu = f_cpu, f_cpu
+        self.f_disk, self.max_f_disk = f_disk, f_disk
+        self.f_memory, self.max_f_memory = f_memory, f_memory
         self.time = float(0)
         self.capacity = [int(cpu), int(memory), int(disk)]
         self.f_capacity = [int(f_cpu), int(f_memory), int(f_disk)] if\
@@ -67,8 +67,17 @@ class AWS_env():
         if self.curr_idx == len(self.arrivals) - 1:
             return None
 
-        return [self.cpu, self.disk, self.memory,
-                self.f_cpu, self.f_disk, self.f_memory]
+        return [
+            self.cpu    / self.max_cpu,
+            self.disk   / self.max_disk,
+            self.memory / self.max_memory,
+            self.f_cpu    / self.max_f_cpu,
+            self.f_disk   / self.max_f_disk,
+            self.f_memory / self.max_f_memory
+        ]
+
+        # return [self.cpu, self.disk, self.memory,
+        #         self.f_cpu, self.f_disk, self.f_memory]
 
 
     def take_action(self, action):
@@ -91,24 +100,29 @@ class AWS_env():
         asked_cpu = self.arrivals.iloc[self.curr_idx]['cpu']
         asked_memory = self.arrivals.iloc[self.curr_idx]['memory']
         asked_disk = self.arrivals.iloc[self.curr_idx]['disk']
-        if action == A_REJECT:
-            pass
-        elif action == A_LOCAL:
+        print(f'asked resources = (CPU={asked_cpu}, mem={asked_memory},disk={asked_disk})')
+        if action == A_LOCAL:
             if self.cpu < asked_cpu or self.memory < asked_memory or\
                     self.disk < asked_disk:
+                print('local action but NO RESSSSSSSSS')
                 reward -= self.arrivals.iloc[self.curr_idx]['reward']
             else:
                 self.cpu -= asked_cpu
                 self.memory -= asked_memory
                 self.disk -= asked_disk
+                self.in_local.append(self.curr_idx)
         elif action == A_FEDERATE:
             if self.f_cpu < asked_cpu or self.f_memory < asked_memory or\
                     self.f_disk < asked_disk:
+                print('federate action but NO RESSSSSSSSS')
                 reward -= self.arrivals.iloc[self.curr_idx]['reward']
             else:
                 self.f_cpu -= asked_cpu
                 self.f_memory -= asked_memory
                 self.f_disk -= asked_disk
+                self.in_fed.append(self.curr_idx)
+        elif action == A_REJECT:
+            pass
 
 
         return reward, self.get_state() # it'll handle the episode END
@@ -118,7 +132,7 @@ class AWS_env():
                               federated):
         # Compute the reward
         arrival = self.arrivals.iloc[arrival_idx]
-        t_end = arrival['lifetime']*24*60*60 + arrival['Timestamp']
+        t_end = arrival['lifetime']*24*60*60 + arrival['time']
         until = min(t_end, curr_time)
         reward = self.arrivals.iloc[arrival_idx]['reward'] *\
                  (until - prev_time) / (60*60) 
@@ -131,20 +145,28 @@ class AWS_env():
         #######################################################################
         
         # Get the spot_prices of the arrival instance and OS
-        spot_history = self.spot_prices[self.spot_prices['InstanceType'] ==\
-                                        arrival['instance'] &\
-                                    self.spot_prices['ProductDescription'] ==\
-                                    arrival['os']]
+        print(f'arrival[instance]={arrival["instance"]}')
+        print(f'arrival[os]={arrival["os"]}')
+        spot_history = self.spot_prices[(self.spot_prices['InstanceType'] ==\
+                                        arrival['instance']) &\
+                                    (self.spot_prices['ProductDescription'] ==\
+                                    arrival['os'])]
 
         # Find first spot price <= prev_time
         before_prev = spot_history[spot_history['Timestamp'] <=\
-                pd.Timestamp(prev_time, unit='s')]
+                pd.Timestamp(prev_time, unit='s', tz='UTC')]
         before_prev.sort_values(by=['Timestamp'], ascending=False, inplace=True)
+
+        # In case there is no previous spot prices
+        if len(before_prev) == 0:
+            before_prev = pd.DataFrame(
+                    {'Timestamp': pd.Timestamp(prev_time, unit='s', tz='UTC')})
         
         # Derive spot prices in [prev_time, curr_time]
-        spot_history = spot_history[spot_history['Timestamp'] >=\
-                before_prev.iloc[0]['Timestamp'] &\
-                spot_history['Timestamp'] <= pd.Timestamp(until, unit='s')]
+        spot_history = spot_history[(spot_history['Timestamp'] >=\
+                before_prev.iloc[0]['Timestamp']) &\
+                (spot_history['Timestamp'] <= pd.Timestamp(until, unit='s',
+                                                           tz='UTC'))]
         spot_history.sort_values(by=['Timestamp'], ascending=False,
                                   inplace=True)
         spot_history = spot_history[['Timestamp', 'SpotPrice']].values
@@ -177,35 +199,42 @@ class AWS_env():
     def __free_resources(self, curr_time):
         remove_local, remove_fed  = [], []
 
+        print(f' ENV:: local deployed={self.in_local}')
+        print(f' ENV:: fed deployed={self.in_fed}')
+
         # Check local arrivals that have expired
         for local_idx in self.in_local:
             expires = self.arrivals.iloc[local_idx]['time'] +\
                 self.arrivals.iloc[local_idx]['lifetime']*24*60*60
             if expires <= curr_time:
-                remove_local.append(self.in_local.index(local_idx))
+                remove_local.append(local_idx)
 
         # Check federated arrivals that have expired
         for fed_idx in self.in_fed:
             expires = self.arrivals.iloc[fed_idx]['time'] +\
                 self.arrivals.iloc[fed_idx]['lifetime']*24*60*60
             if expires <= curr_time:
-                remove_fed.append(self.in_fed.index(fed_idx))
+                remove_fed.append(fed_idx)
 
         # Remove the arrivals from the lists, and free resources
         for rem_loc_idx in remove_local:
-            del self.in_local[rem_loc_idx]
+            print(f'remove local idx = {rem_loc_idx}')
+            print(f'loc list= {self.in_local}')
+            del self.in_local[self.in_local.index(rem_loc_idx)]
             self.cpu    += self.arrivals.iloc[rem_loc_idx]['cpu']
             self.disk   += self.arrivals.iloc[rem_loc_idx]['disk']
             self.memory += self.arrivals.iloc[rem_loc_idx]['memory']
         for rem_fed_idx in remove_fed:
-            del self.in_fed[rem_fed_idx]
+            print(f'remove federeated idx = {rem_fed_idx}')
+            print(f'fed list= {self.in_fed}')
+            del self.in_fed[self.in_fed.index(rem_fed_idx)]
             self.f_cpu    += self.arrivals.iloc[rem_fed_idx]['cpu']
             self.f_disk   += self.arrivals.iloc[rem_fed_idx]['disk']
             self.f_memory += self.arrivals.iloc[rem_fed_idx]['memory']
 
 
     def reset(self):
-        self.__free_resources(curr_time=FUTURE)
+        self.__free_resources(curr_time=FUTURE.timestamp())
         self.curr_idx = 0
 
 
@@ -240,14 +269,18 @@ def create_q_network(k):
     # and that gives the state representation.
     # Then it should give as output x3 Q-values, one per action:
     #
-    # (state,action) --->  NN  ---> Q(state, action) 
+    #                     --> Q(state, local)
+    #                    /
+    # (states) --->  NN  ---> Q(state, federate) 
+    #                    \
+    #                     --> Q(state, reject)
     #
     # return: the tf.model for the NN
 
     model = keras.Sequential([
-        keras.layers.InputLayer(input_shape=(k*6 + 1,)),
-        keras.layers.Dense(128, activation='relu'),
-        keras.layers.Dense(1)
+        keras.layers.InputLayer(input_shape=(k*6,)),
+        keras.layers.Dense(k*6, activation='relu'),
+        keras.layers.Dense(len(ACTIONS))
     ])
 
     print('Just have created the NN, check below the TF summary')
@@ -272,29 +305,33 @@ def atari_loss(model, transitions, training, k, gamma):
     # return: loss for the transition (phi , action , reward , next_phi)
     #
 
-    ins = []
+    ins = None
     labels = None
 
     # Get the maximum reward for next_phi
     for phi, action, reward, next_phi in transitions:
-        rewards = [model(tf.reshape(tf.concat([next_phi, [a]], 0),
-                                    shape=(1,6*k+1)))\
-                   for a in ACTIONS]
-        max_reward = rewards[0]
-        for reward in rewards:
-            if reward < max_reward:
-                max_reward = reward
+        # TODO: a doubt is wether we must still select max action
+        #       i.e., y=[reward + gamma*model(next_phi).max() for _ in\
+        #                                                     range(3)]
+        y = tf.math.add(reward, tf.math.multiply(gamma, model(next_phi)))
 
-        ins.append(phi + [action])
+        print(f'phi = {phi}')
+        print(f'phi shape = {phi.shape}')
+        print(f'ins = {ins}')
+        if ins != None:
+            print(f'ins shape = {ins.shape}')
+        print(f'ins type = {type(ins)} -- phi type = {type(phi)}')
+        # TODO: cast phi to float, seems to crack because dtypes differ
+        ins = tf.concat([ins, phi], 0) if ins != None else phi
 
         if labels == None:
-            labels = reward + gamma * max_reward
+            labels = y
         else:
-            labels = tf.concat([labels, reward + gamma * max_reward], 0)
+            labels = tf.concat([labels, y], 0)
 
     # reshape the transitions to feed them into the Q-network model
-    ins = tf.constant(ins, shape=(len(transitions), k*6+1))
-    labels = tf.constant(labels, shape=(len(transitions), 1))
+    ins = tf.constant(ins, shape=(len(transitions), k*6))
+    #labels = tf.constant(labels, shape=(len(transitions), 1))
     pred = model(ins)
 
     return tf.keras.losses.MSE(y_true=labels, y_pred=pred)
@@ -304,20 +341,23 @@ def atari_loss(model, transitions, training, k, gamma):
 def phi_(sequence, k):
     # it flattens the sequence of last k states
     # sequence: list of lists [[cpu,mem,disk,f_cpu,f_mem,f_disk],
-    #                          [cpu2,mem2,disk2,f_cpu2,f_mem2,f_disk2], ...]
+    #                          [cpu2,mem2,disk2,f_cpu2,f_mem2,f_disk2],
+    #                           ...
+    #                         ]
     flat = []
     for state in sequence[-k:]:
         flat += state
-    
-    return flat
+
+    return tf.reshape(flat, shape=(1, k*6))
 
 
+# TODO: deprecated
 def cast(phi, action, k):
     # casts the phi, action lists to TF matrix
     # phi: list
     # action: integer
     #
-    # return tf tensor of shape (1, k*6+1)
+    # return tf tensor of shape (1, k*6)
     return tf.reshape(tf.concat([phi, [action]], axis=0), shape=(k*6+1))
 
 
@@ -337,27 +377,35 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
 
 
     sequence = []
-    curr_state, next_state = env.get_state(), env.get_state()
     D = ReplayMemory(N=N)
     optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
 
     for episode in range(M):
+        env.reset()
+        curr_state, next_state = env.get_state(), env.get_state()
+        print(f'EPISODE={episode}')
         sequence = [curr_state for _ in range(k)]
         now_phi = phi_(sequence, k=k)
 
+        t = 0
         while next_state != None:
+            t = t + 1
+            print(f'\nt={t}\t')
             # epsilon-greedy action selection
             action = 0
             if random.random() < epsilon:
                 action = ACTIONS[random.randint(0, len(ACTIONS) - 1)]
+                print(f'ϵ-greedy: random action={action}')
             else:
-                in__ = tf.reshape(tf.concat([now_phi, [action]],0), shape=(1, 6*k+1))
-                Qs = [model(in__) for action in ACTIONS]
-                #action = ACTIONS[tf.math.argmax(Qs)]
-                action = ACTIONS[Qs.index(max(Qs))]
+                Q = model(now_phi)
+                action = ACTIONS[Q[0].numpy().argmax()]
+                print(f'ϵ-greedy: max action={action}')
 
             # execute selected action in the environment
             reward, next_state = env.take_action(action)
+            if next_state == None:
+                break
+            print(f'action={action},reward={reward},next_state={next_state}')
             sequence += [next_state]
             next_phi = phi_(sequence, k=k)
             D.add_experience(now_phi, action, reward, next_phi)
@@ -449,7 +497,10 @@ if __name__ == '__main__':
     # Load domains JSON with their resources
     with open(args.domains) as fp:
         domain = json.load(fp)
-    
+
+    # Filter out those arrivals of non-specified instances
+    arrivals = pd.read_csv(args.arrivals)
+    arrivals = arrivals[arrivals['instance'].isin(instances)]
 
     print(f'k={args.k}')
 
@@ -461,7 +512,7 @@ if __name__ == '__main__':
             disk=domain['local']['disk'], f_cpu=domain ['federated']['cpu'],
             f_disk=domain['federated']['disk'],
             f_memory=domain['federated']['memory'],
-            arrivals=pd.read_csv(args.arrivals),
+            arrivals=arrivals,
             spot_prices=prices_df)
     model = create_q_network(k=args.k)
     train_q_network(model=model, k=args.k, epsilon=args.epsilon,
