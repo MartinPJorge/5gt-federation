@@ -123,7 +123,8 @@ if __name__ == '__main__':
             arrivals['cpu'].append(instance_info['cpu'])
             arrivals['memory'].append(instance_info['memory'])
             arrivals['disk'].append(instance_info['disk'])
-            arrivals['reward'].append(100) # TODO: fix this reward
+            arrivals['reward'].append(instance_info['reward']\
+                    if 'reward' in instance_info else 100)
 
 
     ############################################################

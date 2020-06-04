@@ -1,3 +1,4 @@
+import time
 import argparse
 import json
 import numpy as np
@@ -88,7 +89,8 @@ class AWS_env():
         # t = t + 1
         prev_time = self.arrivals.time.iloc[self.curr_idx]
         self.curr_idx += 1
-        curr_time = self.arrivals.time.iloc[self.curr_idx]
+        curr_arrival = self.arrivals.iloc[self.curr_idx]
+        curr_time = curr_arrival['time']
 
         # calculate the reward from [t, t+1]
         reward = self.__calc_reward(prev_time, curr_time)
@@ -97,15 +99,15 @@ class AWS_env():
 
         
         # Assign the resources based on the action
-        asked_cpu = self.arrivals.iloc[self.curr_idx]['cpu']
-        asked_memory = self.arrivals.iloc[self.curr_idx]['memory']
-        asked_disk = self.arrivals.iloc[self.curr_idx]['disk']
+        asked_cpu = curr_arrival['cpu']
+        asked_memory = curr_arrival['memory']
+        asked_disk = curr_arrival['disk']
         print(f'asked resources = (CPU={asked_cpu}, mem={asked_memory},disk={asked_disk})')
         if action == A_LOCAL:
             if self.cpu < asked_cpu or self.memory < asked_memory or\
                     self.disk < asked_disk:
                 print('local action but NO RESSSSSSSSS')
-                reward -= self.arrivals.iloc[self.curr_idx]['reward']
+                reward -= curr_arrival['reward']
             else:
                 self.cpu -= asked_cpu
                 self.memory -= asked_memory
@@ -115,7 +117,7 @@ class AWS_env():
             if self.f_cpu < asked_cpu or self.f_memory < asked_memory or\
                     self.f_disk < asked_disk:
                 print('federate action but NO RESSSSSSSSS')
-                reward -= self.arrivals.iloc[self.curr_idx]['reward']
+                reward -= curr_arrival['reward']
             else:
                 self.f_cpu -= asked_cpu
                 self.f_memory -= asked_memory
@@ -126,6 +128,103 @@ class AWS_env():
 
 
         return reward, self.get_state() # it'll handle the episode END
+
+
+    def __get_pricing_intervals(self, prev_time, until, arrival_idx):
+        # creates a list of spot pricing betweeen [prev, until]
+        # the returned is a list of lists like
+        #   [ [time0, spot_price0], ... [timeN, spot_priceN] ]
+        # with time0>=prev_time and timeN<=until
+        #
+        #
+        # NOTE: this functions handles with the below corner cases in
+        #       which the prev and until values do not lie within the
+        #       SpotPrices history
+        #
+        #
+        #                 --- prev     
+        #                  |          --- prev
+        #                 --- until    | 
+        #    t1,$1 ---                 |
+        #           |                  |
+        #           |                 --- until
+        #           |     --- prev                  
+        #           |      |               
+        #           |      |                       
+        #    t2,$2 ---    ---
+        #           |      |           --- prev
+        #           |     --- until     |
+        #           |                   |
+        #           |                  --- until
+        #    t3,$3 ---
+        #     
+        #       SpotPrices
+        #
+        #def __get_pricing_intervals(self, prev_time, until, arrival_idx):
+
+        # Create timestamp versions for prev and until
+        prev_ts = pd.Timestamp(prev_time, unit='s', tz='UTC')
+        until_ts = pd.Timestamp(until, unit='s', tz='UTC')
+
+        # Get the spot prices history of the arrival instance
+        arrival = self.arrivals.iloc[arrival_idx]
+        spot_history = self.spot_prices[(self.spot_prices['InstanceType'] ==\
+                                        arrival['instance']) &\
+                                    (self.spot_prices['ProductDescription'] ==\
+                                    arrival['os'])]
+        spot_history = spot_history[['Timestamp', 'SpotPrice']]
+        spot_history.sort_values(by='Timestamp', ascending=True, inplace=True)
+        print('HHEAD')
+        print(spot_history.head())
+        print(f'PREV={pd.Timestamp(prev_time, unit="s")}, UNTIL={pd.Timestamp(until, unit="s")}')
+
+        # until < t1
+        if until < spot_history.iloc[0]['Timestamp'].timestamp():
+            return [[prev_ts, spot_history.iloc[0]['SpotPrice']],
+                    [until_ts,     spot_history.iloc[1]['SpotPrice']]]
+
+        spot_history_until = spot_history[
+                                spot_history['Timestamp'] <= until_ts]
+
+        # prev_time < t1  &  until >= t1
+        if prev_ts < spot_history.iloc[0]['Timestamp']:
+            ret_prices = spot_history_until.values
+            ret_prices = [list(sp_t) for sp_t in ret_prices]
+            print('prev_time < t1  &  until >= t1')
+            print(f'type(ret_prices[0][0])={type(ret_prices[0][0])}')
+            print('ret_prices')
+            print(ret_prices)
+            if len(spot_history_until) == 1:
+                ret_prices = [[prev_ts, spot_history.iloc[0]['SpotPrice']]] +\
+                             ret_prices
+            ret_prices[-1][0] = until_ts
+            return ret_prices
+
+        # prev_time >= t1  &  until >= t1
+        spot_history_between = spot_history_until[
+                spot_history_until['Timestamp'] >= prev_ts]
+
+        # no tn:  prev_time <= tn <= until
+        if len(spot_history_between) == 0:
+            return [
+                [prev_ts, spot_history_until.iloc[-1]['SpotPrice']],
+                [until_ts, spot_history_until.iloc[-1]['SpotPrice']]
+            ]
+
+        # !E tn:  prev_time <= tn <= until
+        if len(spot_history_between) == 1:
+            return [
+                [prev_ts, spot_history_between.iloc[-1]['SpotPrice']],
+                [until_ts, spot_history_between.iloc[-1]['SpotPrice']]
+            ]
+
+        # E {tn, tn+1, ...}: prev_time <= tn <= until
+        ret_prices = spot_history_between.values
+        print(f'ret_prices={ret_prices}')
+        ret_prices[0][0] = prev_ts
+        ret_prices[-1][0] = until_ts
+        return ret_prices
+
 
 
     def __calc_arrival_reward(self, prev_time, curr_time, arrival_idx,
@@ -143,40 +242,20 @@ class AWS_env():
         #######################################################################
         # From here down we substract the spot price for the federated arrival
         #######################################################################
-        
-        # Get the spot_prices of the arrival instance and OS
-        print(f'arrival[instance]={arrival["instance"]}')
-        print(f'arrival[os]={arrival["os"]}')
-        spot_history = self.spot_prices[(self.spot_prices['InstanceType'] ==\
-                                        arrival['instance']) &\
-                                    (self.spot_prices['ProductDescription'] ==\
-                                    arrival['os'])]
 
-        # Find first spot price <= prev_time
-        before_prev = spot_history[spot_history['Timestamp'] <=\
-                pd.Timestamp(prev_time, unit='s', tz='UTC')]
-        before_prev.sort_values(by=['Timestamp'], ascending=False, inplace=True)
 
-        # In case there is no previous spot prices
-        if len(before_prev) == 0:
-            before_prev = pd.DataFrame(
-                    {'Timestamp': pd.Timestamp(prev_time, unit='s', tz='UTC')})
-        
-        # Derive spot prices in [prev_time, curr_time]
-        spot_history = spot_history[(spot_history['Timestamp'] >=\
-                before_prev.iloc[0]['Timestamp']) &\
-                (spot_history['Timestamp'] <= pd.Timestamp(until, unit='s',
-                                                           tz='UTC'))]
-        spot_history.sort_values(by=['Timestamp'], ascending=False,
-                                  inplace=True)
-        spot_history = spot_history[['Timestamp', 'SpotPrice']].values
-        spot_history[0] = [spot_history[0][0], until]
-
-        # Now compute the pricing cost
-        # end=[Timestamp,spot_price]
-        for end, begin in zip(spot_history[:-1], spot_history[1:]):
+        pricing = self.__get_pricing_intervals(prev_time, until, arrival_idx)
+        print(f'FEDERATED arrival={arrival_idx}')
+        print(f'reward={reward}')
+        print(f'pricing={pricing}')
+        penalty = 0
+        for end, begin in zip(pricing[:-1], pricing[1:]):
             delta = (end[0].timestamp() - begin[0].timestamp()) / (60*60) # h
+            print('\t\tpenaly iter')
+            penalty += delta * begin[1]
             reward -= delta * begin[1]
+        print(f'\tpenalty={penalty}')
+
 
         return reward
 
@@ -314,27 +393,28 @@ def atari_loss(model, transitions, training, k, gamma):
         #       i.e., y=[reward + gamma*model(next_phi).max() for _ in\
         #                                                     range(3)]
         y = tf.math.add(reward, tf.math.multiply(gamma, model(next_phi)))
-
-        print(f'phi = {phi}')
-        print(f'phi shape = {phi.shape}')
-        print(f'ins = {ins}')
-        if ins != None:
-            print(f'ins shape = {ins.shape}')
-        print(f'ins type = {type(ins)} -- phi type = {type(phi)}')
-        # TODO: cast phi to float, seems to crack because dtypes differ
+        y = y.numpy()
+        phi = tf.cast(phi, dtype=tf.float64)
         ins = tf.concat([ins, phi], 0) if ins != None else phi
+        pred = model(phi)
 
-        if labels == None:
-            labels = y
-        else:
+        # Set y=pred for a!=action
+        for a in ACTIONS:
+            if a != action:
+                y[0][a] = pred.numpy()[0][a]
+        y = tf.constant(y)
+
+        if labels != None:
             labels = tf.concat([labels, y], 0)
+        else:
+            labels = y
 
     # reshape the transitions to feed them into the Q-network model
     ins = tf.constant(ins, shape=(len(transitions), k*6))
     #labels = tf.constant(labels, shape=(len(transitions), 1))
-    pred = model(ins)
+    preds = model(ins)
 
-    return tf.keras.losses.MSE(y_true=labels, y_pred=pred)
+    return tf.keras.losses.MSE(y_true=labels, y_pred=preds)
 
 
 
@@ -389,6 +469,7 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
 
         t = 0
         while next_state != None:
+            start_interval = time.time()
             t = t + 1
             print(f'\nt={t}\t')
             # epsilon-greedy action selection
@@ -402,7 +483,9 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
                 print(f'ϵ-greedy: max action={action}')
 
             # execute selected action in the environment
+            start_action = time.time()
             reward, next_state = env.take_action(action)
+            print(f'time action = {time.time() - start_action}')
             if next_state == None:
                 break
             print(f'action={action},reward={reward},next_state={next_state}')
@@ -410,6 +493,7 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
             next_phi = phi_(sequence, k=k)
             D.add_experience(now_phi, action, reward, next_phi)
 
+            print(f'time interval = {time.time() - start_interval}')
             # If replay memory is small, don't do gradient
             if len(D) < batch_size:
                 now_phi = next_phi
