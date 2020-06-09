@@ -174,20 +174,23 @@ class AWS_env():
                                     arrival['os'])]
         spot_history = spot_history[['Timestamp', 'SpotPrice']]
         spot_history.sort_values(by='Timestamp', ascending=True, inplace=True)
-        print('HHEAD')
-        print(spot_history.head())
-        print(f'PREV={pd.Timestamp(prev_time, unit="s")}, UNTIL={pd.Timestamp(until, unit="s")}')
+        spot_historyFst = spot_history.iloc[0]
+
+        # DEBUG the head
+        # print('HHEAD')
+        # print(spot_history.head())
+        # print(f'PREV={pd.Timestamp(prev_time, unit="s")}, UNTIL={pd.Timestamp(until, unit="s")}')
 
         # until < t1
-        if until < spot_history.iloc[0]['Timestamp'].timestamp():
-            return [[prev_ts, spot_history.iloc[0]['SpotPrice']],
+        if until < spot_historyFst['Timestamp'].timestamp():
+            return [[prev_ts, spot_historyFst['SpotPrice']],
                     [until_ts,     spot_history.iloc[1]['SpotPrice']]]
 
         spot_history_until = spot_history[
                                 spot_history['Timestamp'] <= until_ts]
 
         # prev_time < t1  &  until >= t1
-        if prev_ts < spot_history.iloc[0]['Timestamp']:
+        if prev_ts < spot_historyFst['Timestamp']:
             ret_prices = spot_history_until.values
             ret_prices = [list(sp_t) for sp_t in ret_prices]
             print('prev_time < t1  &  until >= t1')
@@ -195,7 +198,7 @@ class AWS_env():
             print('ret_prices')
             print(ret_prices)
             if len(spot_history_until) == 1:
-                ret_prices = [[prev_ts, spot_history.iloc[0]['SpotPrice']]] +\
+                ret_prices = [[prev_ts, spot_historyFst['SpotPrice']]] +\
                              ret_prices
             ret_prices[-1][0] = until_ts
             return ret_prices
@@ -206,21 +209,23 @@ class AWS_env():
 
         # no tn:  prev_time <= tn <= until
         if len(spot_history_between) == 0:
+            spot_history_untilLst = spot_history_until.iloc[-1]
             return [
-                [prev_ts, spot_history_until.iloc[-1]['SpotPrice']],
-                [until_ts, spot_history_until.iloc[-1]['SpotPrice']]
+                [prev_ts, spot_history_untilLst['SpotPrice']],
+                [until_ts, spot_history_untilLst['SpotPrice']]
             ]
 
         # !E tn:  prev_time <= tn <= until
         if len(spot_history_between) == 1:
+            spot_history_betweenLst = spot_history_between.iloc[-1]
             return [
-                [prev_ts, spot_history_between.iloc[-1]['SpotPrice']],
-                [until_ts, spot_history_between.iloc[-1]['SpotPrice']]
+                [prev_ts, spot_history_betweenLst['SpotPrice']],
+                [until_ts, spot_history_betweenLst['SpotPrice']]
             ]
 
         # E {tn, tn+1, ...}: prev_time <= tn <= until
         ret_prices = spot_history_between.values
-        print(f'ret_prices={ret_prices}')
+        #print(f'ret_prices={ret_prices}')
         ret_prices[0][0] = prev_ts
         ret_prices[-1][0] = until_ts
         return ret_prices
@@ -358,7 +363,13 @@ def create_q_network(k):
 
     model = keras.Sequential([
         keras.layers.InputLayer(input_shape=(k*6,)),
-        keras.layers.Dense(k*6, activation='relu'),
+        #keras.layers.Dense(k*6, activation='relu'),
+        #keras.layers.Dense(k*6, activation='tanh'),
+        #keras.layers.Dense(k*6, activation='sigmoid'),
+        #keras.layers.Dense(k*6),
+        #keras.layers.Dense(len(ACTIONS), activation='sigmoid')
+        #keras.layers.Dense(len(ACTIONS), activation='tanh')
+        #keras.layers.Dense(len(ACTIONS), activation='relu')
         keras.layers.Dense(len(ACTIONS))
     ])
 
@@ -392,7 +403,13 @@ def atari_loss(model, transitions, training, k, gamma):
         # TODO: a doubt is wether we must still select max action
         #       i.e., y=[reward + gamma*model(next_phi).max() for _ in\
         #                                                     range(3)]
-        y = tf.math.add(reward, tf.math.multiply(gamma, model(next_phi)))
+        # TODO-answer: yes it should be, after doing the action, the
+        #              agent will select the maximum benefit by best next
+        #              action
+        Q_next = model(next_phi)
+        Q_max = tf.math.multiply( tf.ones(shape=Q_next.shape),
+                                  tf.math.reduce_max(Q_next) )
+        y = tf.math.add(reward, tf.math.multiply(gamma, Q_max))
         y = y.numpy()
         phi = tf.cast(phi, dtype=tf.float64)
         ins = tf.concat([ins, phi], 0) if ins != None else phi
@@ -442,7 +459,8 @@ def cast(phi, action, k):
 
 
 
-def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
+def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
+                    out=None):
     # Implement the training specified in Algorithm 1 of
     # "Playing Atari with Deep Reinforcement Learning"
     #
@@ -454,11 +472,15 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
     # N: replay memory size
     # batch_size: batch size to compute gradient using replay
     #             memory
+    # out: path where the trained model is stored
+    #
+    # returns: list of episode rewards
 
 
     sequence = []
     D = ReplayMemory(N=N)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=alpha) #alpha=0.01
+    episodes_rewards = []
 
     for episode in range(M):
         env.reset()
@@ -466,6 +488,7 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
         print(f'EPISODE={episode}')
         sequence = [curr_state for _ in range(k)]
         now_phi = phi_(sequence, k=k)
+        expisode_reward = 0
 
         t = 0
         while next_state != None:
@@ -479,12 +502,14 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
                 print(f'ϵ-greedy: random action={action}')
             else:
                 Q = model(now_phi)
+                print(f'all action values={Q}')
                 action = ACTIONS[Q[0].numpy().argmax()]
                 print(f'ϵ-greedy: max action={action}')
 
             # execute selected action in the environment
             start_action = time.time()
             reward, next_state = env.take_action(action)
+            expisode_reward += reward
             print(f'time action = {time.time() - start_action}')
             if next_state == None:
                 break
@@ -516,6 +541,14 @@ def train_q_network(model, k, epsilon, gamma, M, batch_size, N, env):
 
             now_phi = next_phi
             # TODO: one can record the progress
+        
+        episodes_rewards.append(expisode_reward)
+
+    if out != None:
+        model.save(out)
+
+    return episodes_rewards
+
 
 
 
@@ -542,11 +575,13 @@ if __name__ == '__main__':
                         help='epsilon-greedy for the off-policy')
     parser.add_argument('--gamma', type=float,
                         help='discounted factor for the reward')
+    parser.add_argument('--alpha', type=float,
+                        help='learning rate of optimizer')
     parser.add_argument('--M', type=int, help='number of episodes')
     parser.add_argument('--N', type=int, help='replay memory size')
     parser.add_argument('--batch', type=int, help='batch size')
-    parser.add_argument('--out_weights', type=str, default='/tmp/weights',
-                        help='Path where the DQN weights are stored')
+    parser.add_argument('--out_model', type=str, default='/tmp/model',
+                        help='Path where the trained DQN model is stored')
     args = parser.parse_args()
 
 
@@ -600,8 +635,8 @@ if __name__ == '__main__':
             spot_prices=prices_df)
     model = create_q_network(k=args.k)
     train_q_network(model=model, k=args.k, epsilon=args.epsilon,
-            gamma=args.gamma, M=args.M, batch_size=args.batch,
-            N=args.N, env=env)
+            gamma=args.gamma, alpha=args.alpha, M=args.M, batch_size=args.batch,
+            N=args.N, env=env, out=args.out_model)
 
 
 
