@@ -58,23 +58,61 @@ class AWS_env():
         self.curr_idx = 0 # current index in the arrivals DataFrame
         self.in_local = [] # list of arrival indexes in local domain
         self.in_fed = [] # list of arrival indexes in federated domain
+        # ARRIVAL reward
+        self.max_reward = 0
         # SPOT PRICE
         self.spot_prices = spot_prices
         self.spot_prices['Timestamp'] =\
             pd.to_datetime(self.spot_prices['Timestamp'])
+        self.max_spot_prices = {
+            i: 0
+            for i in spot_prices['InstanceType'].unique()
+        }
+
 
 
     def get_state(self):
         if self.curr_idx == len(self.arrivals) - 1:
             return None
 
+        arrival = self.arrivals.iloc[self.curr_idx]
+        instance = arrival['instance']
+        arrival_t = pd.Timestamp(arrival['time'], unit='s', tz='UTC')
+
+        self.max_reward = max(self.max_reward, arrival['reward'])
+
+        # Find what is the latest spot price for that instance
+        spot_price_df = self.spot_prices[
+                    self.spot_prices['InstanceType'] == instance]
+        spot_price_df.sort_values(by='Timestamp', ascending=True, inplace=True)
+        past_prices = spot_price_df[spot_price_df['Timestamp'] <= arrival_t]
+        if len(past_prices) == 0:
+            spot_price = spot_price_df.iloc[0]['SpotPrice']
+        else:
+            spot_price = past_prices.iloc[-1]['SpotPrice']
+        
+        # Update the max spot price for that instance
+        if spot_price > self.max_spot_prices[instance]:
+            self.max_spot_prices[instance] = spot_price
+
+
         return [
+            # Local resources
             self.cpu    / self.max_cpu,
             self.disk   / self.max_disk,
             self.memory / self.max_memory,
+            # Federated resources
             self.f_cpu    / self.max_f_cpu,
             self.f_disk   / self.max_f_disk,
-            self.f_memory / self.max_f_memory
+            self.f_memory / self.max_f_memory,
+            # Arrival local resources consumption
+            arrival['cpu']    / self.cpu,
+            arrival['disk']   / self.disk,
+            arrival['memory'] / self.memory,
+            # Arrival reward per hour
+            arrival['reward'] / self.max_reward,
+            # Arrival spot price
+            spot_price / max(p for p in self.max_spot_prices.values())
         ]
 
         # return [self.cpu, self.disk, self.memory,
@@ -87,17 +125,12 @@ class AWS_env():
         # in case it is the last state, it returns None as state
 
         # t = t + 1
-        prev_time = self.arrivals.time.iloc[self.curr_idx]
-        self.curr_idx += 1
+        reward = 0
         curr_arrival = self.arrivals.iloc[self.curr_idx]
         curr_time = curr_arrival['time']
+        self.curr_idx += 1
+        next_time = self.arrivals.time.iloc[self.curr_idx]
 
-        # calculate the reward from [t, t+1]
-        reward = self.__calc_reward(prev_time, curr_time)
-        # services leave
-        self.__free_resources(curr_time)
-
-        
         # Assign the resources based on the action
         asked_cpu = curr_arrival['cpu']
         asked_memory = curr_arrival['memory']
@@ -125,6 +158,11 @@ class AWS_env():
                 self.in_fed.append(self.curr_idx)
         elif action == A_REJECT:
             pass
+
+        # calculate the reward from [t, t+1]
+        reward += self.__calc_reward(curr_time, next_time)
+        # services leave
+        self.__free_resources(next_time)
 
 
         return reward, self.get_state() # it'll handle the episode END
@@ -362,11 +400,11 @@ def create_q_network(k):
     # return: the tf.model for the NN
 
     model = keras.Sequential([
-        keras.layers.InputLayer(input_shape=(k*6,)),
+        keras.layers.InputLayer(input_shape=(k*11,)),
         #keras.layers.Dense(k*6, activation='relu'),
-        #keras.layers.Dense(k*6, activation='tanh'),
-        #keras.layers.Dense(k*6, activation='sigmoid'),
-        #keras.layers.Dense(k*6),
+        keras.layers.Dense(k*11, activation='tanh'),
+        #keras.layers.Dense(k*11, activation='sigmoid'),
+        #keras.layers.Dense(k*11),
         #keras.layers.Dense(len(ACTIONS), activation='sigmoid')
         #keras.layers.Dense(len(ACTIONS), activation='tanh')
         #keras.layers.Dense(len(ACTIONS), activation='relu')
@@ -396,7 +434,7 @@ def atari_loss(model, transitions, training, k, gamma):
     #
 
     ins = None
-    labels = None
+    labels = []
 
     # Get the maximum reward for next_phi
     for phi, action, reward, next_phi in transitions:
@@ -419,15 +457,15 @@ def atari_loss(model, transitions, training, k, gamma):
         for a in ACTIONS:
             if a != action:
                 y[0][a] = pred.numpy()[0][a]
-        y = tf.constant(y)
+        # y = tf.constant(y) # TODO: check if changing this to constant
 
-        if labels != None:
+        if len(labels):
             labels = tf.concat([labels, y], 0)
         else:
             labels = y
 
     # reshape the transitions to feed them into the Q-network model
-    ins = tf.constant(ins, shape=(len(transitions), k*6))
+    ins = tf.constant(ins, shape=(len(transitions), k*11))
     #labels = tf.constant(labels, shape=(len(transitions), 1))
     preds = model(ins)
 
@@ -445,7 +483,7 @@ def phi_(sequence, k):
     for state in sequence[-k:]:
         flat += state
 
-    return tf.reshape(flat, shape=(1, k*6))
+    return tf.reshape(flat, shape=(1, k*11))
 
 
 # TODO: deprecated
@@ -459,8 +497,8 @@ def cast(phi, action, k):
 
 
 
-def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
-                    out=None):
+def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
+                    batch_size, N, env, out=None):
     # Implement the training specified in Algorithm 1 of
     # "Playing Atari with Deep Reinforcement Learning"
     #
@@ -479,7 +517,8 @@ def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
 
     sequence = []
     D = ReplayMemory(N=N)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=alpha) #alpha=0.01
+    # optimizer = tf.keras.optimizers.SGD(learning_rate=alpha) #alpha=0.01
+    optimizer = tf.keras.optimizers.RMSprop()
     episodes_rewards = []
 
     for episode in range(M):
@@ -489,12 +528,15 @@ def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
         sequence = [curr_state for _ in range(k)]
         now_phi = phi_(sequence, k=k)
         expisode_reward = 0
+        epsilon = episode / (M-1) * (epsilon_end - epsilon_start)\
+                  + epsilon_start
 
         t = 0
         while next_state != None:
             start_interval = time.time()
             t = t + 1
             print(f'\nt={t}\t')
+            print(f'Q-network at t={t}: {model(now_phi)}')
             # epsilon-greedy action selection
             action = 0
             if random.random() < epsilon:
@@ -502,9 +544,9 @@ def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
                 print(f'ϵ-greedy: random action={action}')
             else:
                 Q = model(now_phi)
-                print(f'all action values={Q}')
                 action = ACTIONS[Q[0].numpy().argmax()]
                 print(f'ϵ-greedy: max action={action}')
+                #print(f'\tmax all action values={Q}')
 
             # execute selected action in the environment
             start_action = time.time()
@@ -526,6 +568,7 @@ def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
 
             # Sample from experience replay, compute loss,
             # and apply the gradient
+            start_action = time.time()
             with tf.GradientTape() as tape:
                 loss = atari_loss(model=model,
                         transitions=D.sample(num_experiences=batch_size),
@@ -538,6 +581,7 @@ def train_q_network(model, k, epsilon, gamma, alpha, M, batch_size, N, env,
             print(f'grads={grads}')
             optimizer.apply_gradients(zip(grads,
                                           model.trainable_variables))
+            print(f'time gradient descend = {time.time() - start_interval}')
 
             now_phi = next_phi
             # TODO: one can record the progress
@@ -571,8 +615,10 @@ if __name__ == '__main__':
                         help='size of history to represent the state')
     parser.add_argument('train', type=bool, help='True|False')
     # Training arguments
-    parser.add_argument('--epsilon', type=float,
-                        help='epsilon-greedy for the off-policy')
+    parser.add_argument('--epsilon_start', type=float,
+                        help='epsilon-greedy 1st value for the off-policy')
+    parser.add_argument('--epsilon_end', type=float,
+                        help='epsilon-greedy last value for the off-policy')
     parser.add_argument('--gamma', type=float,
                         help='discounted factor for the reward')
     parser.add_argument('--alpha', type=float,
@@ -587,14 +633,17 @@ if __name__ == '__main__':
 
 
     # Check arguments
-    if args.epsilon > 1 or args.epsilon < 0:
-        print(f'epsion={args.epsilon}, but it must belong to [0,1]')
+    if args.epsilon_start > 1 or args.epsilon_start < 0:
+        print(f'epsilon_start={args.epsilon_start}, but it must belong to [0,1]')
+        sys.exit(1)
+    if args.epsilon_end > 1 or args.epsilon_end < 0:
+        print(f'epsilon_end={args.epsilon_end}, but it must belong to [0,1]')
         sys.exit(1)
     if args.k < 0:
         print(f'k={k}, but it must be >0')
         sys.exit(1)
     if args.gamma > 1 or args.gamma < 0:
-        print(f'epsion={args.gamma}, but it must belong to [0,1]')
+        print(f'gamma={args.gamma}, but it must belong to [0,1]')
         sys.exit(1)
 
 
@@ -624,17 +673,18 @@ if __name__ == '__main__':
     print(f'k={args.k}')
 
 
-    #############
-    # START DQN #
-    #############
+    # Create the environment
     env = AWS_env(cpu=domain['local']['cpu'], memory=domain['local']['memory'],
             disk=domain['local']['disk'], f_cpu=domain ['federated']['cpu'],
             f_disk=domain['federated']['disk'],
             f_memory=domain['federated']['memory'],
             arrivals=arrivals,
             spot_prices=prices_df)
+
+    # Create the Q-network
     model = create_q_network(k=args.k)
-    train_q_network(model=model, k=args.k, epsilon=args.epsilon,
+    train_q_network(model=model, k=args.k,
+            epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
             gamma=args.gamma, alpha=args.alpha, M=args.M, batch_size=args.batch,
             N=args.N, env=env, out=args.out_model)
 
