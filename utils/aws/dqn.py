@@ -181,7 +181,7 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
         sequence = [curr_state for _ in range(k)]
         now_phi = phi_(sequence, k=k)
         expisode_reward = 0
-        epsilon = episode / (M-1) * (epsilon_end - epsilon_start)\
+        epsilon = (episode+1) / M * (epsilon_end - epsilon_start)\
                   + epsilon_start
 
         t = 0
@@ -249,6 +249,33 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
 
 
 
+def test_q_network(model, k, env):
+    # model: q_network trained with parameter k
+    # k: history length
+    # env: environmnet to take actions
+    #
+    # returns: the SAR, i.e, sequences, actions, rewards
+
+    env.reset()
+    rewards, actions = [], []
+    state = env.get_state()
+    state_sequence = [state for _ in range(k)]
+
+    t = 0
+    while state != None:
+        print(f't={t} test')
+        # Select the maximum action for the Q(·)
+        phi = phi_(state_sequence, k=k)
+        Q = model(phi)
+        actions += [AWS_env.ACTIONS[Q[0].numpy().argmax()]]
+
+        # execute selected action in the environment
+        reward, state = env.take_action(actions[-1])
+        rewards += [reward]
+        state_sequence += [state]
+        t += 1
+
+    return state_sequence[-(len(actions)+1):-1], actions, rewards
 
 
 if __name__ == '__main__':
@@ -267,7 +294,7 @@ if __name__ == '__main__':
                         help='path to JSON with local|federated resources')
     parser.add_argument('k', type=int,
                         help='size of history to represent the state')
-    parser.add_argument('train', type=bool, help='True|False')
+    parser.add_argument('--train', action='store_true', default=False)
     # Training arguments
     parser.add_argument('--epsilon_start', type=float,
                         help='epsilon-greedy 1st value for the off-policy')
@@ -280,6 +307,8 @@ if __name__ == '__main__':
     parser.add_argument('--M', type=int, help='number of episodes')
     parser.add_argument('--N', type=int, help='replay memory size')
     parser.add_argument('--batch', type=int, help='batch size')
+    parser.add_argument('--in_model', type=str, default='/tmp/model',
+                        help='Path where the trained DQN model is stored')
     parser.add_argument('--out_model', type=str, default='/tmp/model',
                         help='Path where the trained DQN model is stored')
     args = parser.parse_args()
@@ -287,18 +316,24 @@ if __name__ == '__main__':
 
 
     # Check arguments
-    if args.epsilon_start > 1 or args.epsilon_start < 0:
-        print(f'epsilon_start={args.epsilon_start}, but it must belong to [0,1]')
-        sys.exit(1)
-    if args.epsilon_end > 1 or args.epsilon_end < 0:
-        print(f'epsilon_end={args.epsilon_end}, but it must belong to [0,1]')
-        sys.exit(1)
     if args.k < 0:
         print(f'k={k}, but it must be >0')
         sys.exit(1)
-    if args.gamma > 1 or args.gamma < 0:
-        print(f'gamma={args.gamma}, but it must belong to [0,1]')
-        sys.exit(1)
+    print(f'traIN={args.train}')
+    if args.train == True:
+        if args.epsilon_start > 1 or args.epsilon_start < 0:
+            print(f'epsilon_start={args.epsilon_start}, but it must belong to [0,1]')
+            sys.exit(1)
+        if args.epsilon_end > 1 or args.epsilon_end < 0:
+            print(f'epsilon_end={args.epsilon_end}, but it must belong to [0,1]')
+            sys.exit(1)
+        if args.gamma > 1 or args.gamma < 0:
+            print(f'gamma={args.gamma}, but it must belong to [0,1]')
+            sys.exit(1)
+    else:
+        if not args.in_model:
+            print(f'in_model parameter missing, required for testing')
+            sys.exit(1)
 
 
     # Get the instances
@@ -335,12 +370,20 @@ if __name__ == '__main__':
             arrivals=arrivals,
             spot_prices=prices_df)
 
-    # Create the Q-network
-    model = create_q_network(k=args.k)
-    train_q_network(model=model, k=args.k,
-            epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
-            gamma=args.gamma, alpha=args.alpha, M=args.M, batch_size=args.batch,
-            N=args.N, env=env, out=args.out_model)
+    # Create the Q-network #### TRAIN
+    if args.train == True:
+        model = create_q_network(k=args.k)
+        train_q_network(model=model, k=args.k,
+                epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
+                gamma=args.gamma, alpha=args.alpha, M=args.M,
+                batch_size=args.batch, N=args.N, env=env, out=args.out_model)
+    # Load the Q-network   #### TEST
+    else:
+        model = tf.keras.models.load_model(args.in_model)
+        states, actions, rewards = test_q_network(model, args.k, env)
+        print('State|action|reward')
+        for t in range(len(states)):
+            print(f'{states[t]}|{actions[t]}|{rewards[t]}')
 
 
 

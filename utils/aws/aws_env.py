@@ -88,9 +88,9 @@ class AWS_env():
             self.f_disk   / self.max_f_disk,
             self.f_memory / self.max_f_memory,
             # Arrival local resources consumption
-            arrival['cpu']    / self.cpu    if self.cpu    > 0 else 1,
-            arrival['disk']   / self.disk   if self.disk   > 0 else 1,
-            arrival['memory'] / self.memory if self.memory > 0 else 1,
+            arrival['cpu']    / self.cpu    if self.cpu    > 0 else 1.1,
+            arrival['disk']   / self.disk   if self.disk   > 0 else 1.1,
+            arrival['memory'] / self.memory if self.memory > 0 else 1.1,
             # Arrival reward per hour
             arrival['reward'] / self.max_reward,
             # Arrival spot price
