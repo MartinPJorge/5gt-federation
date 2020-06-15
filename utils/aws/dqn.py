@@ -266,11 +266,15 @@ def test_q_network(model, k, env):
         print(f't={t} test')
         # Select the maximum action for the Q(·)
         phi = phi_(state_sequence, k=k)
+        st_q = time.time()
         Q = model(phi)
+        print(f'it takes {time.time() - st_q} seconds to feed forward')
         actions += [AWS_env.ACTIONS[Q[0].numpy().argmax()]]
 
         # execute selected action in the environment
+        st_a = time.time()
         reward, state = env.take_action(actions[-1])
+        print(f'it takes {time.time() - st_a} seconds to act')
         rewards += [reward]
         state_sequence += [state]
         t += 1
