@@ -9,6 +9,7 @@ import math
 from aws_env import AWS_env
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+import sys
 
 FIND_BEST_Q=False # runs all combinations of alpha and discount
 FEDERATED=True # federated domain to find best combinations in Q-learning
@@ -34,6 +35,8 @@ def initialize_q_table():
     return qtable
 
 def adapt_number(number):
+    if number == 1.1:
+        return 1
 
     # number = number*1000
     x = math.ceil(number*100)*0.01
@@ -62,7 +65,8 @@ def calculate_total_states(cpu, memory, disk, f_cpu, f_disk, f_memory):
     return tot_states
 
 
-def q_learning(env, alpha, discount, episodes, out= None):
+def q_learning(env, alpha, discount, episodes,
+               epsilon_start=None, epsilon_end=None, out= None):
 
     qtable = initialize_q_table()
     tot_actions = 3
@@ -76,13 +80,26 @@ def q_learning(env, alpha, discount, episodes, out= None):
         sim_active = True
         episode_reward = 0
         t = 0
+
+        # Derive the episode epsilon
+        if epsilon_start != None and epsilon_end != None:
+            epsilon = (episode+1) / episodes * (epsilon_end - epsilon_start)\
+                      + epsilon_start
+
         while next_state != None:
             start_interval = time.time()
             t = t + 1
             print(f'\nt={t}\t')
             print(f'Q-network at t={t}')
             action = 0
-            action = np.argmax(qtable[state_to_row(curr_state)] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
+
+            if epsilon_start != None and epsilon_end != None:
+                action = np.argmax(qtable[state_to_row(curr_state)])\
+                         if np.random.random() < epsilon else\
+                         np.random.randint(tot_actions)
+            else:
+                action = np.argmax(qtable[state_to_row(curr_state)] +\
+                                   np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
             print(f'Action taken={action}')
             start_action = time.time()
             reward, next_state = env.take_action(action)
@@ -100,11 +117,43 @@ def q_learning(env, alpha, discount, episodes, out= None):
         episodes_rewards.append(episode_reward)
     
     if out != None:
-        model.save(out)
+        print('Storing the q-table')
+        print(out)
+        with open(out, 'w') as fp:
+            json.dump({str(st): qtable[st] for st in qtable}, fp)
     
     
     return episodes_rewards
 
+
+
+def test_q_table(qtable, env):
+    # qtable: the Q-table to test
+    # env: environmnet to take actions
+    #
+    # returns: the SAR, i.e, sequences, actions, rewards
+
+    env.reset()
+    rewards, actions = [], []
+    state = env.get_state()
+    state_sequence = [state]
+
+    t = 0
+    while state != None:
+        print(f't={t} test')
+        # Select the maximum action for the Q(·)
+        action = np.argmax(qtable[state_to_row(state)])
+        actions += [action]
+
+        # execute selected action in the environment
+        st_a = time.time()
+        reward, state = env.take_action(actions[-1])
+        print(f'it takes {time.time() - st_a} seconds to act')
+        rewards += [reward]
+        state_sequence += [state]
+        t += 1
+
+    return state_sequence[-(len(actions)+1):-1], actions, rewards
     
 
 
@@ -122,8 +171,11 @@ if __name__ == '__main__':
                         help='path to CSV with arrivals dataframe')
     parser.add_argument('domains', type=str,
                         help='path to JSON with local|federated resources')
-
-                          # Training arguments
+    # Training arguments
+    parser.add_argument('--epsilon_start', type=float,
+                        help='epsilon-greedy 1st value for the off-policy')
+    parser.add_argument('--epsilon_end', type=float,
+                        help='epsilon-greedy last value for the off-policy')
     parser.add_argument('--train', action='store_true', default=False)
     parser.add_argument('--gamma', type=float,
                         help='discounted factor for the reward')
@@ -136,6 +188,7 @@ if __name__ == '__main__':
                         help='Path where the trained DQN model is stored')
     args = parser.parse_args()
 
+    print(args.epsilon_start, args.epsilon_end)
     # Check arguments
     print(f'traIN={args.train}')
     if args.train == True:
@@ -188,7 +241,19 @@ if __name__ == '__main__':
     # print(adapt_number(number))
 
 
-    episode_reward = q_learning(env=env, alpha= args.alpha, discount= args.gamma, episodes= args.M, out= None)
+    if args.train == True:
+        episode_reward = q_learning(env=env, alpha= args.alpha,
+                discount=args.gamma, episodes= args.M, out= args.out_model,
+                epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end)
+    else:
+        with open(args.in_model, 'r') as fp:
+            qtable = json.load(fp)
+        qtable = {eval(st): qtable[st] for st in qtable.keys()}
+        states, actions, rewards = test_q_table(qtable, env)
+        print('State|action|reward')
+        for t in range(len(states)):
+            print(f'{states[t]}|{actions[t]}|{rewards[t]}')
+        sys.exit(0)
 
     max_profit = max(episode_reward)
    
