@@ -7,6 +7,8 @@ import pandas as pd
 import random
 import math
 from aws_env import AWS_env
+import matplotlib as mpl
+from matplotlib import pyplot as plt
 
 FIND_BEST_Q=False # runs all combinations of alpha and discount
 FEDERATED=True # federated domain to find best combinations in Q-learning
@@ -34,7 +36,7 @@ def initialize_q_table():
 def adapt_number(number):
 
     # number = number*1000
-    x = math.ceil(number*1000)*0.001
+    x = math.ceil(number*100)*0.01
     y = x*1000%10
     b = 1 if y>=5 else 0
     result = int(x*10)/10+(b*0.1)
@@ -80,16 +82,16 @@ def q_learning(env, alpha, discount, episodes, out= None):
             print(f'\nt={t}\t')
             print(f'Q-network at t={t}')
             action = 0
-            
-
             action = np.argmax(qtable[state_to_row(curr_state)] + np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
+            print(f'Action taken={action}')
             start_action = time.time()
             reward, next_state = env.take_action(action)
             episode_reward += reward
-            print(f'time action = {time.time() - start_action}')
-            print(f'action={action},reward={reward}, current_state={curr_state},next_state={next_state}')
-            print(f'time interval = {time.time() - start_interval}')
+            # print(f'time action = {time.time() - start_action}')
+            # print(f'action={action},reward={reward}, current_state={curr_state},next_state={next_state}')
+            # print(f'time interval = {time.time() - start_interval}')
             if next_state == None:
+                print("Qtable(current_state):", qtable[state_to_row(curr_state)])
                 break
             else:
                 qtable[state_to_row(curr_state)][action] += alpha * (reward + discount * np.max(qtable[state_to_row(next_state)]) - qtable[state_to_row(curr_state)][action])
@@ -178,7 +180,7 @@ if __name__ == '__main__':
             arrivals=arrivals,
             spot_prices=prices_df)
     
-    # number = 0.7999999999999999
+    # number = 0.799999999999999999999
     # print(math.ceil(number))
     # b =  math.ceil(number*1000)*0.001
     # print(b)
@@ -186,7 +188,7 @@ if __name__ == '__main__':
     # print(adapt_number(number))
 
 
-    rewards = q_learning(env=env, alpha= args.alpha, discount= args.gamma, episodes= args.M, out= None)
+    episode_reward = q_learning(env=env, alpha= args.alpha, discount= args.gamma, episodes= args.M, out= None)
 
     max_profit = max(episode_reward)
    
@@ -205,7 +207,8 @@ if __name__ == '__main__':
 
     plt.legend(loc='best', handlelength=4)
     
-    filename = "../../results/result.png"
+    print("Total rewards: ", episode_reward)
+    filename = "../../../results/result.png"
     # os.makedirs(os.path.dirname(filename), exist_ok=True)
     plt.savefig(filename)
 
