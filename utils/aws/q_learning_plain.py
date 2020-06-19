@@ -208,26 +208,9 @@ if __name__ == '__main__':
     plt.legend(loc='best', handlelength=4)
     
     print("Total rewards: ", episode_reward)
-    filename = "../../../results/result.png"
+    # filename = "../../../results/result.png"
     # os.makedirs(os.path.dirname(filename), exist_ok=True)
-    plt.savefig(filename)
+    # plt.savefig(filename)
 
-    plt.show()
+    # plt.show()
     
-    
-    
-    # print('\n\n', rewards)
-    # #Initialize Q-Table
-    # qtable = initialize_q_table()
-    # print(qtable[(0.1,0.1,0.1,0.1,0.1)])
-    # #Get Environmental State
-    # state = env.get_state()
-    # print(state)
-    
-    # print(state_to_row(state))
-    # # state_sequence = len([state for _ in range(10)])
-    # # print(state_sequence)
-    # # q_state = [qtable[state_to_row(state)]['local'], qtable[state_to_row(state)]['federate'], qtable[state_to_row(state)]['reject']]
-    # print( qtable[state_to_row(state)][0])
-    # print( np.max(qtable[state_to_row(state)]))
-
