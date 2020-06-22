@@ -193,7 +193,7 @@ AWS environment. The network receives as state the:
  * arrival instance asked resources
  * arrival instance €/hour
  * AWS spot price for that instance when it arrived
- 
+
 At the start of the simulation, action is choosen randomly (deploy locally, federate or reject the service arrival). The action is executed in the AWS environment (with `take_action()`). The taken action returns the reward for the executed action of the arrived service. The returned reward is used to update the Q-table of the q-learning algorithm. As the simulation progress, the decision is "leaning" towards the Q-table values.
 
 To train the plain Q-learning approach the script is invoked in similar manner: 
@@ -226,7 +226,7 @@ python3 q_learning_plain.py\
 as output it will prompt a list of `state|action|reward` lines.
 
 # Greedy approach (TID) applied to the AWS environment
-The script `greedy_plain.py` contains a basic greedy approach based on [4] to interact with the
+The script `greedy_plain.py` contains a basic greedy approach based on [5] to interact with the
 AWS environment. The network receives as state the:
  * local resources
  * federated resources
