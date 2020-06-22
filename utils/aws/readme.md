@@ -185,6 +185,64 @@ python3 dqn.py\
 ```
 as output it will prompt a list of `state|action|reward` lines.
 
+# Q-learning (master branch) applied to the AWS environment
+The script `q_learning_plain.py` contains a basic Q-learnig approach based on [4] to interact with the
+AWS environment. The network receives as state the:
+ * local resources
+ * federated resources
+ * arrival instance asked resources
+ * arrival instance €/hour
+ * AWS spot price for that instance when it arrived
+At the start of the simulation, action is choosen randomly (deploy locally, federate or reject the service arrival). The action is executed in the AWS environment (with `take_action()`). The taken action returns the reward for the executed action of the arrived service. The returned reward is used to update the Q-table of the q-learning algorithm. As the simulation progress, the decision is "leaning" towards the Q-table values.
+
+To train the plain Q-learning approach the script is invoked in similar manner: 
+```bash
+python3 q_learning_plain.py\
+    ec2-prices-march-to-may.csv\       # AWS spot prices
+    "t3a.small|t3a.medium|t3.large"\   # instances to use
+    aws-arrivals.csv\                  # instances' arrivals
+    domains.json\                      # local|fed resources JSON
+    --train\                           # flag to specify training
+    --epsilon_start 1\                 # epsilon-greedy value @training-start
+    --epsilon_end 0.1\                 # epsilon-greedy value @training-end
+    --gamma 0.01\                      # discount factor
+    --alpha 0.01\                      # learning rate for gradiend descend
+    --M 50\                            # training episodes
+    --out_model /tmp/model\            # path where model values are stored
+    &> /tmp/log                        # log file
+```
+
+Once the Q-table is populated and trained, it is ready to be used by running:
+```bash
+python3 q_learning_plain.py\
+    ec2-prices-march-to-may.csv\       # AWS spot prices
+    "t3a.small|t3a.medium|t3.large"\   # instances to use
+    aws-arrivals.csv\                  # instances' arrivals
+    domains.json\                      # local|fed resources JSON
+    --in_model /tmp/model\             # path where trained model is stored
+    &> /tmp/log                        # log file
+```
+as output it will prompt a list of `state|action|reward` lines.
+
+# Greedy approach (TID) applied to the AWS environment
+The script `greedy_plain.py` contains a basic greedy approach based on [4] to interact with the
+AWS environment. The network receives as state the:
+ * local resources
+ * federated resources
+ * arrival instance asked resources
+ * arrival instance €/hour
+ * AWS spot price for that instance when it arrived
+For each arrival, the algorithm checks the state of the local resources. If the local resources are available, the arrival is deployed locally. If there are not enough local resources, the algorithm checks the state of the federated resources. If there are enough federated resources, the arrival is deployed in the federated domain. If there are not enough local and not enough federated resources, the service arrival is rejected. 
+
+To run the greedy algorithm, the script is invoked as:
+```bash
+python3 greedy_plain.py\
+    ec2-prices-march-to-may.csv\       # AWS spot prices
+    "t3a.small|t3a.medium|t3.large"\   # instances to use
+    aws-arrivals.csv\                  # instances' arrivals
+    domains.json\                      # local|fed resources JSON
+    &> /tmp/log                        # log file
+```
 
 ## References
 [1] Xu, Hong, and Baochun Li. "Dynamic cloud pricing for revenue maximization." IEEE Transactions on Cloud Computing 1.2 (2013): 158-171.
@@ -193,3 +251,6 @@ as output it will prompt a list of `state|action|reward` lines.
 
 [3] Mnih, Volodymyr, et al. "Playing atari with deep reinforcement learning." arXiv preprint arXiv:1312.5602 (2013).
 
+[4] Antevski, Kiril, et al. "A Q-learning strategy for federation of 5G services", ICC 2020
+
+[5] Solano, Alberto and Contreras, Luis M. "Information Exchange to Support Multi-Domain Slice Service Provision for 5G/NFV", 2nd International Workshop on Network Slicing (Network Slicing 2020),International Federation for Information Processing (IFIP) Networking 2020 Conference (NETWORKING 2020)
