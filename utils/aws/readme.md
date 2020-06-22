@@ -193,6 +193,7 @@ AWS environment. The network receives as state the:
  * arrival instance asked resources
  * arrival instance €/hour
  * AWS spot price for that instance when it arrived
+ 
 At the start of the simulation, action is choosen randomly (deploy locally, federate or reject the service arrival). The action is executed in the AWS environment (with `take_action()`). The taken action returns the reward for the executed action of the arrived service. The returned reward is used to update the Q-table of the q-learning algorithm. As the simulation progress, the decision is "leaning" towards the Q-table values.
 
 To train the plain Q-learning approach the script is invoked in similar manner: 
@@ -232,6 +233,7 @@ AWS environment. The network receives as state the:
  * arrival instance asked resources
  * arrival instance €/hour
  * AWS spot price for that instance when it arrived
+ 
 For each arrival, the algorithm checks the state of the local resources. If the local resources are available, the arrival is deployed locally. If there are not enough local resources, the algorithm checks the state of the federated resources. If there are enough federated resources, the arrival is deployed in the federated domain. If there are not enough local and not enough federated resources, the service arrival is rejected. 
 
 To run the greedy algorithm, the script is invoked as:
