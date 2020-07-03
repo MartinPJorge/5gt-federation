@@ -35,7 +35,7 @@ def initialize_q_table():
     return qtable
 
 def adapt_number(number):
-    if number == 1.1:
+    if number > 1:
         return 1
 
     # number = number*1000
