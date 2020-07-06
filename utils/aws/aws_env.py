@@ -1,6 +1,7 @@
 import pandas as pd
 import math
 import time
+import logging
 
 class AWS_env():
     # ACTIONs macros
@@ -22,6 +23,8 @@ class AWS_env():
         # spot_prices: pandas DataFrame with columns
         #              ['AvailabilityZone', 'InstanceType',
         #               'ProductDescription', 'SpotPrice', 'Timestamp']
+        # NOTE: the class uses the logging module, assumed to be set
+        #       outside the environment creation
 
         self.cpu, self.max_cpu = cpu, cpu
         self.disk, self.max_disk = disk, disk
@@ -135,11 +138,11 @@ class AWS_env():
         asked_cpu = curr_arrival['cpu']
         asked_memory = curr_arrival['memory']
         asked_disk = curr_arrival['disk']
-        print(f'asked resources = (CPU={asked_cpu}, mem={asked_memory},disk={asked_disk})')
+        logging.debug(f'asked resources = (CPU={asked_cpu}, mem={asked_memory},disk={asked_disk})')
         if action == AWS_env.A_LOCAL:
             if self.cpu < asked_cpu or self.memory < asked_memory or\
                     self.disk < asked_disk:
-                print('local action but NO RESSSSSSSSS')
+                logging.debug('local action but NO RESSSSSSSSS')
                 reward -= curr_arrival['reward']
             else:
                 self.cpu -= asked_cpu
@@ -149,7 +152,7 @@ class AWS_env():
         elif action == AWS_env.A_FEDERATE:
             if self.f_cpu < asked_cpu or self.f_memory < asked_memory or\
                     self.f_disk < asked_disk:
-                print('federate action but NO RESSSSSSSSS')
+                logging.debug('federate action but NO RESSSSSSSSS')
                 reward -= curr_arrival['reward']
             else:
                 self.f_cpu -= asked_cpu
@@ -219,10 +222,10 @@ class AWS_env():
         cached_interval = self.__cache_get_interval(arrival['instance'],
                 arrival['os'], prev_ts, until_ts)
         if len(cached_interval) > 0:
-            print('CACHE HIT')
+            logging.debug('CACHE HIT')
             return cached_interval
 
-        ### tic = time.time()
+        tic = time.time()
         ### spot_history = self.spot_prices[(self.spot_prices['InstanceType'] ==\
         ###                                 arrival['instance']) &\
         ###                             (self.spot_prices['ProductDescription'] ==\
@@ -251,16 +254,16 @@ class AWS_env():
         tic = time.time()
         spot_history_until = spot_history[
                                 spot_history['Timestamp'] <= until_ts]
-        print(f'\t\tfilter until takes {time.time() - tic}')
+        logging.debug(f'\t\tfilter until takes {time.time() - tic}')
 
         # prev_time < t1  &  until >= t1
         if prev_ts < spot_historyFst['Timestamp']:
             ret_prices = spot_history_until.values
             ret_prices = [list(sp_t) for sp_t in ret_prices]
-            print('prev_time < t1  &  until >= t1')
-            print(f'type(ret_prices[0][0])={type(ret_prices[0][0])}')
-            print('ret_prices')
-            print(ret_prices)
+            logging.debug('prev_time < t1  &  until >= t1')
+            logging.debug(f'type(ret_prices[0][0])={type(ret_prices[0][0])}')
+            logging.debug('ret_prices')
+            logging.debug(ret_prices)
             if len(spot_history_until) == 1:
                 ret_prices = [[prev_ts, spot_historyFst['SpotPrice']]] +\
                              ret_prices
@@ -274,7 +277,7 @@ class AWS_env():
         tic = time.time()
         spot_history_between = spot_history_until[
                 spot_history_until['Timestamp'] >= prev_ts]
-        print(f'\t\tfilter after prev takes {time.time() - tic}')
+        logging.debug(f'\t\tfilter after prev takes {time.time() - tic}')
 
         # no tn:  prev_time <= tn <= until
         if len(spot_history_between) == 0:
@@ -328,16 +331,16 @@ class AWS_env():
 
 
         pricing = self.__get_pricing_intervals(prev_time, until, arrival_idx)
-        print(f'FEDERATED arrival={arrival_idx}')
-        print(f'reward={reward}')
-        print(f'pricing={pricing}')
+        logging.debug(f'FEDERATED arrival={arrival_idx}')
+        logging.debug(f'reward={reward}')
+        logging.debug(f'pricing={pricing}')
         penalty = 0
         for end, begin in zip(pricing[:-1], pricing[1:]):
             delta = (end[0].timestamp() - begin[0].timestamp()) / (60*60) # h
-            print('\t\tpenaly iter')
+            logging.debug('\t\tpenaly iter')
             penalty += delta * begin[1]
             reward -= delta * begin[1]
-        print(f'\tpenalty={penalty}')
+        logging.debug(f'\tpenalty={penalty}')
 
 
         return reward
@@ -352,12 +355,12 @@ class AWS_env():
         for local_idx in self.in_local:
             reward += self.__calc_arrival_reward(prev_time, curr_time,
                     local_idx, federated=False)
-        print(f'\tit takes {time.time() - st_loc} to obtain local rewards')
+        logging.debug(f'\tit takes {time.time() - st_loc} to obtain local rewards')
         st_fed = time.time()
         for fed_idx in self.in_fed:
             reward += self.__calc_arrival_reward(prev_time, curr_time,
                     fed_idx, federated=True)
-        print(f'\tit takes {time.time() - st_fed} to obtain fed rewards')
+        logging.debug(f'\tit takes {time.time() - st_fed} to obtain fed rewards')
 
         return reward
 
@@ -365,8 +368,8 @@ class AWS_env():
     def __free_resources(self, curr_time):
         remove_local, remove_fed  = [], []
 
-        print(f' ENV:: local deployed={self.in_local}')
-        print(f' ENV:: fed deployed={self.in_fed}')
+        logging.debug(f' ENV:: local deployed={self.in_local}')
+        logging.debug(f' ENV:: fed deployed={self.in_fed}')
 
         # Check local arrivals that have expired
         for local_idx in self.in_local:
@@ -384,15 +387,15 @@ class AWS_env():
 
         # Remove the arrivals from the lists, and free resources
         for rem_loc_idx in remove_local:
-            print(f'remove local idx = {rem_loc_idx}')
-            print(f'loc list= {self.in_local}')
+            logging.debug(f'remove local idx = {rem_loc_idx}')
+            logging.debug(f'loc list= {self.in_local}')
             del self.in_local[self.in_local.index(rem_loc_idx)]
             self.cpu    += self.arrivals.iloc[rem_loc_idx]['cpu']
             self.disk   += self.arrivals.iloc[rem_loc_idx]['disk']
             self.memory += self.arrivals.iloc[rem_loc_idx]['memory']
         for rem_fed_idx in remove_fed:
-            print(f'remove federeated idx = {rem_fed_idx}')
-            print(f'fed list= {self.in_fed}')
+            logging.debug(f'remove federeated idx = {rem_fed_idx}')
+            logging.debug(f'fed list= {self.in_fed}')
             del self.in_fed[self.in_fed.index(rem_fed_idx)]
             self.f_cpu    += self.arrivals.iloc[rem_fed_idx]['cpu']
             self.f_disk   += self.arrivals.iloc[rem_fed_idx]['disk']

@@ -49,6 +49,8 @@ if __name__ == '__main__':
                             'or * wildcard to plot all')
     parser.add_argument('lf_std', type=int,
                         help='lifetime in lifetime+-lf_std/100')
+    parser.add_argument('fee_margin', type=float,
+                        help='0.n fee price above the spot price percentage')
     parser.add_argument('out', type=str, default='/tmp/ec2-arrivals.csv',
                         help='Path of the CSV where EC2 arrivals are stored')
     args = parser.parse_args()
@@ -67,6 +69,11 @@ if __name__ == '__main__':
             if args.instance_types == '*' else args.instance_types.split('|')
     # Filter the asked instances
     prices_df = prices_df[prices_df['InstanceType'].isin(instances)]
+
+    # Retain the original dataframe to latter query spot prices
+    orig_prices_df = pd.DataFrame(prices_df)
+    orig_prices_df['Timestamp'] = pd.to_datetime(orig_prices_df['Timestamp'])
+    orig_prices_df.sort_values(by='Timestamp', ascending=True, inplace=True)
 
     
     #############################
@@ -104,10 +111,13 @@ if __name__ == '__main__':
     print('Generating the time arrivals')
     for idx, row in avg_prices_df.iterrows():
         instance_info = instances_info[row['InstanceType']]
+        print('Generating arrivals for ' + row['InstanceType'])
         arrival_rate = fArrival(p=row['AvgSpotPrice'] /\
                                     max_spot_price[row['InstanceType']],
                                 k=instance_info['fk'], a=instance_info['fa'],
                                 b=instance_info['fb'])
+        instance_prices = orig_prices_df[orig_prices_df['InstanceType'] ==\
+                                            row['InstanceType']]
         i, epoch = 0, row['Timestamp'].timestamp()
         while i < int(arrival_rate): # e.g. i < 3 instances/that-day
             epoch += rexp(scale=1/arrival_rate)*24*60*60
@@ -115,16 +125,27 @@ if __name__ == '__main__':
                     a=instance_info['lifetime']*(1-args.lf_std/100),
                     b=instance_info['lifetime']*(1+args.lf_std/100))[0]
             i += 1
+
+            # Find associated spot price
+            past_prices = instance_prices[instance_prices['Timestamp'] <=\
+                                pd.Timestamp(epoch, unit='s', tz='UTC')]
+            if len(past_prices) == 0: # avg spot price starts at 00:00
+                                      # whilst first real price might be at
+                                      # 23:00
+                past_prices = instance_prices[instance_prices['Timestamp'] <=\
+                             pd.Timestamp(epoch+24*60*60, unit='s', tz='UTC')]
+            spot_price = past_prices['SpotPrice'].iloc[-1]
+            print('\t', spot_price)
+
             arrivals['time'].append(epoch)
             arrivals['instance'].append(row['InstanceType'])
-            arrivals['spotprice'].append(row['AvgSpotPrice'])
+            arrivals['spotprice'].append(spot_price)
             arrivals['os'].append(row['ProductDescription'])
             arrivals['lifetime'].append(lifetime)
             arrivals['cpu'].append(instance_info['cpu'])
             arrivals['memory'].append(instance_info['memory'])
             arrivals['disk'].append(instance_info['disk'])
-            arrivals['reward'].append(instance_info['reward']\
-                    if 'reward' in instance_info else 100)
+            arrivals['reward'].append(spot_price * (1+args.fee_margin))
 
 
     ############################################################

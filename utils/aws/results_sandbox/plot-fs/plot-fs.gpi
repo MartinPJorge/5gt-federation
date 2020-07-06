@@ -1,0 +1,36 @@
+set term eps
+set output "/tmp/fs.eps"
+
+# Color palette taken from
+# http://www.gnuplotting.org/ease-your-plotting-with-config-snippets/
+# line styles
+set style line 1 lt 1 lc rgb '#1B9E77' # dark teal
+set style line 2 lt 1 lc rgb '#D95F02' # dark orange
+set style line 3 lt 1 lc rgb '#7570B3' # dark lilac
+set style line 4 lt 1 lc rgb '#E7298A' # dark magenta
+set style line 5 lt 1 lc rgb '#66A61E' # dark lime green
+set style line 6 lt 1 lc rgb '#E6AB02' # dark banana
+set style line 7 lt 1 lc rgb '#A6761D' # dark tan
+set style line 8 lt 1 lc rgb '#666666' # dark gray
+
+set xrange [0:1]
+set xlabel "p^{(t)} - normalized AWS spot price"
+set ylabel "f(p^{(t)}) - arrival rate [instances/day]"
+set xtics 0,0.1,1
+
+set tics scale 0
+set grid
+
+f(k, a, b, x) = k * (1 - x**a)**b
+
+
+set label "3.51" at 0.5,f(4.056804470051198, 2, 0.5, 0.5) point ls 1 pt 28 ps 2.2 front offset   -2,1.2
+set label "8.78" at 0.5,f(10.142011175127998, 2, 0.5, 0.5) point ls 2 pt 28 ps 2.2 front offset  -2,1.2
+set label "17.57" at 0.5,f(20.284022350255995, 2, 0.5, 0.5) point ls 3 pt 28 ps 2.2 front offset -2,1.2
+
+plot f(4.056804470051198, 2, 0.5, x) ls 1 dt 2 lw 12 t "c5d.4xlarge",\
+    f(10.142011175127998, 2, 0.5, x) ls 2 dt 4 lw 12 t "c5.2xlarge",\
+    f(20.284022350255995, 2, 0.5, x) ls 3 dt 6 lw 12 t "t3a.small",\
+    NaN  w points ls 8 ps 1.5 pt 27 t "[LUIS-TID]"
+
+

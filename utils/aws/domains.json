@@ -1,12 +1,12 @@
 {
     "local": {
-        "cpu": 100,
-        "disk": 10000,
-        "memory": 400
+        "cpu": 80,
+        "disk": 2000,
+        "memory": 160
     },
     "federated": {
-        "cpu": 400,
-        "disk": 40000,
-        "memory": 1600
+        "cpu": 480,
+        "disk": 12000,
+        "memory": 960
     }
 }

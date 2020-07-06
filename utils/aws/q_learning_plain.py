@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 import pandas as pd
 import random
+import logging
 import math
 from aws_env import AWS_env
 import matplotlib as mpl
@@ -81,6 +82,8 @@ def q_learning(env, alpha, discount, episodes,
         episode_reward = 0
         t = 0
 
+        logging.info('EPISODE=%d' % episode)
+
         # Derive the episode epsilon
         if epsilon_start != None and epsilon_end != None:
             epsilon = (episode+1) / episodes * (epsilon_end - epsilon_start)\
@@ -89,8 +92,8 @@ def q_learning(env, alpha, discount, episodes,
         while next_state != None:
             start_interval = time.time()
             t = t + 1
-            print(f'\nt={t}\t')
-            print(f'Q-network at t={t}')
+            logging.debug(f'\nt={t}\t')
+            logging.debug(f'Q-network at t={t}')
             action = 0
 
             if epsilon_start != None and epsilon_end != None:
@@ -100,7 +103,7 @@ def q_learning(env, alpha, discount, episodes,
             else:
                 action = np.argmax(qtable[state_to_row(curr_state)] +\
                                    np.random.randn(1, tot_actions) * (1 / float(episode + 1)))
-            print(f'Action taken={action}')
+            logging.debug(f'Action taken={action}')
             start_action = time.time()
             reward, next_state = env.take_action(action)
             episode_reward += reward
@@ -108,7 +111,7 @@ def q_learning(env, alpha, discount, episodes,
             # print(f'action={action},reward={reward}, current_state={curr_state},next_state={next_state}')
             # print(f'time interval = {time.time() - start_interval}')
             if next_state == None:
-                print("Qtable(current_state):", qtable[state_to_row(curr_state)])
+                logging.debug("Qtable(current_state):", qtable[state_to_row(curr_state)])
                 break
             else:
                 qtable[state_to_row(curr_state)][action] += alpha * (reward + discount * np.max(qtable[state_to_row(next_state)]) - qtable[state_to_row(curr_state)][action])
@@ -117,8 +120,8 @@ def q_learning(env, alpha, discount, episodes,
         episodes_rewards.append(episode_reward)
     
     if out != None:
-        print('Storing the q-table')
-        print(out)
+        logging.info('Storing the q-table')
+        logging.info(out)
         with open(out, 'w') as fp:
             json.dump({str(st): qtable[st] for st in qtable}, fp)
     
@@ -140,7 +143,7 @@ def test_q_table(qtable, env):
 
     t = 0
     while state != None:
-        print(f't={t} test')
+        logging.info(f't={t} test')
         # Select the maximum action for the Q(·)
         action = np.argmax(qtable[state_to_row(state)])
         actions += [action]
@@ -148,7 +151,7 @@ def test_q_table(qtable, env):
         # execute selected action in the environment
         st_a = time.time()
         reward, state = env.take_action(actions[-1])
-        print(f'it takes {time.time() - st_a} seconds to act')
+        logging.info(f'it takes {time.time() - st_a} seconds to act')
         rewards += [reward]
         state_sequence += [state]
         t += 1
@@ -182,30 +185,37 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=float,
                         help='learning rate of optimizer')
     parser.add_argument('--M', type=int, help='number of episodes')
+    parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--in_model', type=str, default='/tmp/model',
                         help='Path where the trained DQN model is stored')
     parser.add_argument('--out_model', type=str, default='/tmp/model',
                         help='Path where the trained DQN model is stored')
     args = parser.parse_args()
 
-    print(args.epsilon_start, args.epsilon_end)
+
+    # Set the logger
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+
+    logging.info(args.epsilon_start, args.epsilon_end)
     # Check arguments
-    print(f'traIN={args.train}')
+    logging.info(f'traIN={args.train}')
     if args.train == True:
         if args.gamma > 1 or args.gamma < 0:
-            print(f'gamma={args.gamma}, but it must belong to [0,1]')
+            logging.info(f'gamma={args.gamma}, but it must belong to [0,1]')
             sys.exit(1)
         if args.alpha > 1 or args.alpha < 0:
-            print(f'gamma={args.alpha}, but it must belong to [0,1]')
+            logging.info(f'gamma={args.alpha}, but it must belong to [0,1]')
             sys.exit(1)    
     else:
         if not args.in_model:
-            print(f'in_model parameter missing, required for testing')
+            logging.info(f'in_model parameter missing, required for testing')
             sys.exit(1)
 
     
-     # Get the instances
-    instances = list(prices_df['InstanceType'].unique()) if args.instance_types == '*' else args.instance_types.split('|')
+    # Get the instances
+    instances = list(pd.read_csv(args.prices_csvs)['InstanceType'].unique())\
+            if args.instance_types == '*'\
+            else args.instance_types.split('|')
 
     # Load AWS prices CSVs
     prices_dfs = []
@@ -250,17 +260,17 @@ if __name__ == '__main__':
             qtable = json.load(fp)
         qtable = {eval(st): qtable[st] for st in qtable.keys()}
         states, actions, rewards = test_q_table(qtable, env)
-        print('State|action|reward')
+        logging.info('State|action|reward')
         for t in range(len(states)):
-            print(f'{states[t]}|{actions[t]}|{rewards[t]}')
+            logging.info(f'{states[t]}|{actions[t]}|{rewards[t]}')
         sys.exit(0)
 
     max_profit = max(episode_reward)
    
 
-    print("--------------- MAXIMUM PROFITS ---------------")
+    logging.info("--------------- MAXIMUM PROFITS ---------------")
 
-    print("\tQ learning Federation: ", max(episode_reward))
+    logging.info("\tQ learning Federation: ", max(episode_reward))
 
     x = np.arange(0, len(episode_reward), 1)
     fig, ax = plt.subplots()
@@ -272,7 +282,7 @@ if __name__ == '__main__':
 
     plt.legend(loc='best', handlelength=4)
     
-    print("Total rewards: ", episode_reward)
+    logging.info("Total rewards: ", episode_reward)
     # filename = "../../../results/result.png"
     # os.makedirs(os.path.dirname(filename), exist_ok=True)
     # plt.savefig(filename)

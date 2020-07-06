@@ -9,6 +9,7 @@ from tensorflow import keras
 import random
 import math
 from aws_env import AWS_env
+import logging
 
 
 
@@ -64,7 +65,7 @@ def create_q_network(k):
         keras.layers.Dense(len(AWS_env.ACTIONS))
     ])
 
-    print('Just have created the NN, check below the TF summary')
+    logging.info('Just have created the NN, check below the TF summary')
     model.summary()
 
     return model
@@ -177,7 +178,7 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
     for episode in range(M):
         env.reset()
         curr_state, next_state = env.get_state(), env.get_state()
-        print(f'EPISODE={episode}')
+        logging.info(f'EPISODE={episode}')
         sequence = [curr_state for _ in range(k)]
         now_phi = phi_(sequence, k=k)
         expisode_reward = 0
@@ -188,33 +189,33 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
         while next_state != None:
             start_interval = time.time()
             t = t + 1
-            print(f'\nt={t}\t')
-            print(f'Q-network at t={t}: {model(now_phi)}')
+            logging.debug(f'\nt={t}\t')
+            logging.debug(f'Q-network at t={t}: {model(now_phi)}')
             # epsilon-greedy action selection
             action = 0
             if random.random() < epsilon:
                 action = AWS_env.ACTIONS[random.randint(0,
                                          len(AWS_env.ACTIONS) - 1)]
-                print(f'ϵ-greedy: random action={action}')
+                logging.debug(f'ϵ-greedy: random action={action}')
             else:
                 Q = model(now_phi)
                 action = AWS_env.ACTIONS[Q[0].numpy().argmax()]
-                print(f'ϵ-greedy: max action={action}')
+                logging.debug(f'ϵ-greedy: max action={action}')
                 #print(f'\tmax all action values={Q}')
 
             # execute selected action in the environment
             start_action = time.time()
             reward, next_state = env.take_action(action)
             expisode_reward += reward
-            print(f'time action = {time.time() - start_action}')
+            logging.debug(f'time action = {time.time() - start_action}')
             if next_state == None:
                 break
-            print(f'action={action},reward={reward},next_state={next_state}')
+            logging.debug(f'action={action},reward={reward},next_state={next_state}')
             sequence += [next_state]
             next_phi = phi_(sequence, k=k)
             D.add_experience(now_phi, action, reward, next_phi)
 
-            print(f'time interval = {time.time() - start_interval}')
+            logging.debug(f'time interval = {time.time() - start_interval}')
             # If replay memory is small, don't do gradient
             if len(D) < batch_size:
                 now_phi = next_phi
@@ -227,15 +228,15 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
                 loss = atari_loss(model=model,
                         transitions=D.sample(num_experiences=batch_size),
                         training=True, k=k, gamma=gamma)
-                print(f'loss shape={loss.shape}')
-                print(f'loss type={type(loss)}')
-                print(f'loss={loss}')
-                print(f'mod-train-vars={model.trainable_variables}')
+                logging.debug(f'loss shape={loss.shape}')
+                logging.debug(f'loss type={type(loss)}')
+                logging.debug(f'loss={loss}')
+                logging.debug(f'mod-train-vars={model.trainable_variables}')
                 grads = tape.gradient(loss, model.trainable_variables)
-            print(f'grads={grads}')
+            logging.debug(f'grads={grads}')
             optimizer.apply_gradients(zip(grads,
                                           model.trainable_variables))
-            print(f'time gradient descend = {time.time() - start_interval}')
+            logging.debug(f'time gradient descend = {time.time() - start_interval}')
 
             now_phi = next_phi
             # TODO: one can record the progress
@@ -244,6 +245,7 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
 
     if out != None:
         model.save(out)
+
 
     return episodes_rewards
 
@@ -263,18 +265,18 @@ def test_q_network(model, k, env):
 
     t = 0
     while state != None:
-        print(f't={t} test')
+        logging.info(f't={t} test')
         # Select the maximum action for the Q(·)
         phi = phi_(state_sequence, k=k)
         st_q = time.time()
         Q = model(phi)
-        print(f'it takes {time.time() - st_q} seconds to feed forward')
+        logging.info(f'it takes {time.time() - st_q} seconds to feed forward')
         actions += [AWS_env.ACTIONS[Q[0].numpy().argmax()]]
 
         # execute selected action in the environment
         st_a = time.time()
         reward, state = env.take_action(actions[-1])
-        print(f'it takes {time.time() - st_a} seconds to act')
+        logging.info(f'it takes {time.time() - st_a} seconds to act')
         rewards += [reward]
         state_sequence += [state]
         t += 1
@@ -311,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--M', type=int, help='number of episodes')
     parser.add_argument('--N', type=int, help='replay memory size')
     parser.add_argument('--batch', type=int, help='batch size')
+    parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--in_model', type=str, default='/tmp/model',
                         help='Path where the trained DQN model is stored')
     parser.add_argument('--out_model', type=str, default='/tmp/model',
@@ -318,30 +321,33 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
+    # Set the logger
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+
 
     # Check arguments
     if args.k < 0:
-        print(f'k={k}, but it must be >0')
+        logging.info(f'k={k}, but it must be >0')
         sys.exit(1)
-    print(f'traIN={args.train}')
+    logging.info(f'traIN={args.train}')
     if args.train == True:
         if args.epsilon_start > 1 or args.epsilon_start < 0:
-            print(f'epsilon_start={args.epsilon_start}, but it must belong to [0,1]')
+            logging.info(f'epsilon_start={args.epsilon_start}, but it must belong to [0,1]')
             sys.exit(1)
         if args.epsilon_end > 1 or args.epsilon_end < 0:
-            print(f'epsilon_end={args.epsilon_end}, but it must belong to [0,1]')
+            logging.info(f'epsilon_end={args.epsilon_end}, but it must belong to [0,1]')
             sys.exit(1)
         if args.gamma > 1 or args.gamma < 0:
-            print(f'gamma={args.gamma}, but it must belong to [0,1]')
+            logging.info(f'gamma={args.gamma}, but it must belong to [0,1]')
             sys.exit(1)
     else:
         if not args.in_model:
-            print(f'in_model parameter missing, required for testing')
+            logging.info(f'in_model parameter missing, required for testing')
             sys.exit(1)
 
 
     # Get the instances
-    instances = list(prices_df['InstanceType'].unique())\
+    instances = list(pd.read_csv(args.prices_csvs)['InstanceType'].unique())\
             if args.instance_types == '*'\
             else args.instance_types.split('|')
 
@@ -363,7 +369,7 @@ if __name__ == '__main__':
     arrivals = pd.read_csv(args.arrivals)
     arrivals = arrivals[arrivals['instance'].isin(instances)]
 
-    print(f'k={args.k}')
+    logging.info(f'k={args.k}')
 
 
     # Create the environment
@@ -377,17 +383,19 @@ if __name__ == '__main__':
     # Create the Q-network #### TRAIN
     if args.train == True:
         model = create_q_network(k=args.k)
-        train_q_network(model=model, k=args.k,
+        epi_rewards = train_q_network(model=model, k=args.k,
                 epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
                 gamma=args.gamma, alpha=args.alpha, M=args.M,
                 batch_size=args.batch, N=args.N, env=env, out=args.out_model)
+        logging.info('== EPISODE REWARDS ==')
+        logging.info(epi_rewards)
     # Load the Q-network   #### TEST
     else:
         model = tf.keras.models.load_model(args.in_model)
         states, actions, rewards = test_q_network(model, args.k, env)
-        print('State|action|reward')
+        logging.info('State|action|reward')
         for t in range(len(states)):
-            print(f'{states[t]}|{actions[t]}|{rewards[t]}')
+            logging.info(f'{states[t]}|{actions[t]}|{rewards[t]}')
 
 
 
