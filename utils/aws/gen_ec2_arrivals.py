@@ -47,7 +47,7 @@ if __name__ == '__main__':
                         help='|-separated list of instances: ' +\
                             't3a.nano|t3a.small|...\n' +\
                             'or * wildcard to plot all')
-    parser.add_argument('lf_std', type=int,
+    parser.add_argument('lf_std', type=float,
                         help='lifetime in lifetime+-lf_std/100')
     parser.add_argument('fee_margin', type=float,
                         help='0.n fee price above the spot price percentage')
