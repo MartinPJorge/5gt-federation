@@ -78,7 +78,7 @@ subject to no_federation_disk_runout {t in timestamps}:
 # Note: as an instance might leave in between [t-1,t]
 #       we compute the profit in between [t-1, min(t,departure)]
 maximize dynamic_profit:
-    sum {i in instances, t in timestamps:
+    sum {i in instances, t in timestamps: t <> first(timestamps) and
             instance_arrival[i] <= prev(t) and prev(t) <= instance_departure[i]}
         ( min(t, instance_departure[i]) - prev(t) ) / (60*60) *
         (local[instance_arrival[i]] 
