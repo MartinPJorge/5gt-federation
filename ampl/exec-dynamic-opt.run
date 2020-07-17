@@ -1,0 +1,46 @@
+reset;
+option solver gurobi;
+model dynamic-pricing-model.mod;
+data /tmp/o.dat;
+
+fix cpu[first(timestamps)] := 80;
+fix disk[first(timestamps)] := 2000;
+fix mem[first(timestamps)] := 160;
+fix federation_cpu[first(timestamps)] := 480;
+fix federation_disk[first(timestamps)] := 12000;
+fix federation_mem[first(timestamps)] := 960;
+
+
+solve;
+
+# Print all variables
+display local > /tmp/optimal-solution.out;
+display federate >> /tmp/optimal-solution.out;
+display reject >> /tmp/optimal-solution.out;
+display cpu >> /tmp/optimal-solution.out;
+display mem >> /tmp/optimal-solution.out;
+display disk >> /tmp/optimal-solution.out;
+display federation_cpu >> /tmp/optimal-solution.out;
+display federation_mem >> /tmp/optimal-solution.out;
+display federation_disk >> /tmp/optimal-solution.out;
+display instances >> /tmp/optimal-solution.out;
+display instance_types >> /tmp/optimal-solution.out;
+display timestamps >> /tmp/optimal-solution.out;
+display itype >> /tmp/optimal-solution.out;
+display margin >> /tmp/optimal-solution.out;
+display federate_fee >> /tmp/optimal-solution.out;
+display instance_arrival >> /tmp/optimal-solution.out;
+display instance_departure >> /tmp/optimal-solution.out;
+display asked_cpu >> /tmp/optimal-solution.out;
+display asked_mem >> /tmp/optimal-solution.out;
+display asked_disk >> /tmp/optimal-solution.out;
+display frees_cpu >> /tmp/optimal-solution.out;
+display frees_mem >> /tmp/optimal-solution.out;
+display frees_disk >> /tmp/optimal-solution.out;
+display frees_arrival >> /tmp/optimal-solution.out;
+display dynamic_profit >> /tmp/optimal-solution.out;
+
+
+
+
+
