@@ -2,8 +2,10 @@
 
 from amplpy import AMPL, DataFrame
 import argparse
+import sys
 import json
 import pandas as pd
+import time
 
 
 if __name__ == '__main__':
@@ -36,11 +38,10 @@ if __name__ == '__main__':
 
 
     # Open the spot prices
-    spot_prices_df = pd.read_csv(args.prices)
-    spot_prices_df = spot_prices_df[spot_prices_df['InstanceType'].isin(
-                    args.instances.split('|'))]
-    spot_prices_df['Timestamp'] = pd.to_datetime(spot_prices_df['Timestamp'])
-    spot_prices_df.sort_values(by='Timestamp', inplace=True, ascending=True)
+    spot_ = pd.read_csv(args.prices)
+    spot_ = spot_[spot_['InstanceType'].isin(args.instances.split('|'))]
+    spot_['Timestamp'] = pd.to_datetime(spot_['Timestamp'])
+    spot_.sort_values(by='Timestamp', inplace=True, ascending=True)
 
     # Open the arrivals of specified instances
     arrivals_df = pd.read_csv(args.arrivals)
@@ -49,131 +50,216 @@ if __name__ == '__main__':
     arrivals_df.sort_values(by='time', inplace=True, ascending=True)
 
     # Define the parameters
+    instance_types = args.instances.split('|') + ['null']
     federate_fee = {}
-    instances, instance_arrival, instance_departure = [], [], []
+    itype = {}
+    instances, instance_arrival, instance_departure = [], {}, {}
+    instantiations = {it : [] for it in instance_types}
     available = {}
+    timestamps = []
     asked_cpu, asked_mem, asked_disk = [], [], []
     frees_cpu, frees_mem, frees_disk, frees_arrival  = [], [], [], []
 
     # Set the federate fee - note we consider arrivals' timestamps
+    print('Filling arrivals resources parameters')
     for idx, row in arrivals_df.iterrows():
         t, instance = row['time'], row['instance']
-        historic = prices_df[(prices_df['InstanceType']==instance) &
-                (prices_df['time'] <= pd.Timestamp(t, unit='s', tz='utc'))]
 
-        # Double check if there are historic spot price values
-        if len(historic) == 0:
-            federate_fee[(t, instance)] = prices_df[
-                    prices_df['InstanceType'] == instance]['SpotPrice'].iloc[0]
-        else:
-            federate_fee[(t, instance)] = historic['SpotPrice'].iloc[0]
-
+        # Arrival event
         timestamps += [t]
-        instances += [f'instance-{t}']
-        instance_arrival += [t]
+        instances += [f'{instance}-{t}']
+        itype[instances[-1]] = instance
+        instantiations[instance] += [instances[-1]]
+        instance_arrival[instances[-1]] = t
+        instance_departure[instances[-1]] = t + 60*60 * row['lifetime']
         asked_cpu += [row['cpu']]
-        asked_memory += [row['memory']]
+        asked_mem += [row['memory']]
         asked_disk += [row['disk']]
+        frees_cpu += [0]
+        frees_mem += [0]
+        frees_disk += [0]
+        frees_arrival += [timestamps[0]] # whatever here - freed resources is 0
+
+        # Departure event - null instance associated
+        timestamps += [t + 60*60 * row['lifetime']]
+        instances += [f'null-{t}']
+        itype[instances[-1]] = 'null'
+        instantiations['null'] += [instances[-1]]
+        instance_arrival[instances[-1]] = timestamps[-1]
+        instance_departure[instances[-1]] = sys.maxsize # leaves at infinity
+        asked_cpu += [0]
+        asked_mem += [0]
+        asked_disk += [0]
+        frees_cpu += [row['cpu']]
+        frees_mem += [row['memory']]
+        frees_disk += [row['disk']]
+        frees_arrival += [t]
+
+    # Create arrivals-departure dataframe
+    arrivals_departures = pd.DataFrame({
+        'instance': instances,
+        'time': timestamps,
+        'asked_cpu': asked_cpu,
+        'asked_mem': asked_mem,
+        'asked_disk': asked_disk,
+        'frees_cpu': frees_cpu,
+        'frees_mem': frees_mem,
+        'frees_disk': frees_disk,
+        'frees_arrival': frees_arrival
+    })
+    arrivals_departures.sort_values(by='time', inplace=True, ascending=True)
 
 
-    # TODO - introduce the null instances for each instance departure
-    #        that way the model holds
-    # Fill availability
-    # TODO
-    # Fill frees_{cpu,mem,disk,arrival}
-    # note, aggregate freed resources 
-    # fill instance_departure - round it to the next arrival
-    #instance_departure += [t + 60*60 * row['lifetime']] # lifetime->days
+    # Derive the spot price at t for every instance
+    print('Filling federation fees parameters')
+    j = 0
+    for t in timestamps:
+        h = spot_[spot_['Timestamp'] <= pd.Timestamp(t, unit='s', tz='utc')]
+        print(f'{j}/{len(timestamps)}', end='\r')
+        j += 1
 
-    with open(args.arrivals, 'r') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        next(reader, None)
-        for row in reader:
-            times += [float(row[2])]
-            asked_cpu += [float(row[3])]
-            asked_mem += [float(row[4])]
-            asked_disk += [float(row[5])]
-            asked_lifes += [float(row[6])]
-            profit_federate += [1]
-            profit_local += [float(row[7])]
-            profit_reject += [-float(row[7])]
+        for i_type in instance_types:
+            if len(h) > 0:
+                hi = h[h['InstanceType'] == i_type]
+            hi = None if len(h) == 0 or len(hi) == 0 else hi
 
-            # Include the leaving
-            leaves_time += [times[-1] + asked_lifes[-1]]
-            leaves_arrival += [times[-1]]
-            leaves_cpu += [asked_cpu[-1]]
-            leaves_mem += [asked_mem[-1]]
-            leaves_disk += [asked_disk[-1]]
+            if type(hi) == type(None):
+                federate_fee[(i_type, t)] = spot_[spot_['InstanceType'] ==\
+                        i_type]['SpotPrice'].iloc[0]\
+                            if i_type != 'null' else 0
+            else:
+                federate_fee[(i_type, t)] = hi['SpotPrice'].iloc[-1]\
+                        if i_type != 'null' else 0
 
 
-    # create the events dictionary
-    events = {}
-    for i in range(len(times)):
-        events[times[i]] = {
-            'profit_federate': profit_federate[i],
-            'profit_local': profit_local[i],
-            'profit_reject': profit_reject[i],
-            'asked_cpu': asked_cpu[i],
-            'asked_mem': asked_mem[i],
-            'asked_disk': asked_disk[i],
-            'frees_mem': 0,
-            'frees_cpu': 0,
-            'frees_disk': 0,
-            'frees_arrival': leaves_arrival[0]
-        }
-    for i in range(len(leaves_time)):
-        events[leaves_time[i]] = {
-            'profit_federate': 0,
-            'profit_local': 0,
-            'profit_reject': 0,
-            'asked_cpu': 0,
-            'asked_mem': 0,
-            'asked_disk': 0,
-            'frees_mem': leaves_mem[i],
-            'frees_cpu': leaves_cpu[i],
-            'frees_disk': leaves_disk[i],
-            'frees_arrival': leaves_arrival[i]
-        }
+    # Fill each instance availability
+    ## print('Filling time availability')
+    ## available = {
+    ##     (i, t): 0
+    ##     for i in instances
+    ##     for t in timestamps
+    ## }
+    ## avk = available.keys()
+    ## j = 0
+    ## for idx, row in arrivals_departures.iterrows():
+    ##     print(f'{j}/{len(arrivals_departures)}', end='\r')
+    ##     j += 1
+    ##     departure = instance_departure[row['instance']]
+    ##     for t in timestamps:
+    ##         if t >= row['time'] and t <= departure:
+    ##             available[(i,t)] = 1
 
-    # Set the ordered timestamps
-    timestamps = times + leaves_time
-    timestamps.sort()
-    ampl.set['timestamps'] = timestamps
 
-    # Set profits
-    df = DataFrame(('timestamps'), 'profit_federate')
-    df.setValues({t: events[t]['profit_federate'] for t in events.keys()})
+
+    # Fill the sets
+    print('Dumping instance_types using amplpy')
+    start = time.time()
+    ampl.set['instance_types'] = instance_types
+    print(f'It took {time.time() - start} seconds')
+    print('Dumping timestamps using amplpy')
+    start = time.time()
+    ampl.set['timestamps'] = list(arrivals_departures['time'])
+    print(f'It took {time.time() - start} seconds')
+    print('Dumping instances using amplpy')
+    start = time.time()
+    ampl.set['instances'] = instances
+    print(f'It took {time.time() - start} seconds')
+
+
+    # Fill the parameters
+    print('Dumping itypes using amplpy')
+    start = time.time()
+    df = DataFrame(('instances'), 'itype')
+    df.setValues({i: itype[i] for i in instances})
     ampl.setData(df)
-    df = DataFrame(('timestamps'), 'profit_local')
-    df.setValues({t: events[t]['profit_local'] for t in events.keys()})
-    ampl.setData(df)
-    df = DataFrame(('timestamps'), 'profit_reject')
-    df.setValues({t: events[t]['profit_reject'] for t in events.keys()})
-    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
 
-    # Set asked resources
+    print('Dumping federate_fee using amplpy')
+    start = time.time()
+    df = DataFrame(('instances', 'timestamps'), 'federate_fee')
+    df.setValues({(it,t): federate_fee[(it,t)]
+                          for (it,t) in federate_fee.keys()})
+    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping instance_arrival using amplpy')
+    start = time.time()
+    df = DataFrame(('instances'), 'instance_arrival')
+    df.setValues({i: instance_arrival[i] for i in instance_arrival.keys()})
+    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping instance_departure using amplpy')
+    start = time.time()
+    df = DataFrame(('instances'), 'instance_departure')
+    df.setValues({i: instance_departure[i] for i in instance_departure.keys()})
+    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    ## print('Dumping available using amplpy')
+    ## start = time.time()
+    ## df = DataFrame(('instances', 'timestamps'), 'available')
+    ## df.setValues({(i,t): available[(i,t)] for (i,t) in available.keys()})
+    ## ampl.setData(df)
+    ## print(f'It took {time.time() - start} seconds')
+
+    print('Dumping asked_cpu using amplpy')
+    start = time.time()
     df = DataFrame(('timestamps'), 'asked_cpu')
-    df.setValues({t: events[t]['asked_cpu'] for t in events.keys()})
+    df.setValues({r['time']: r['asked_cpu']
+                  for _, r in arrivals_departures.iterrows()})
     ampl.setData(df)
-    df = DataFrame(('timestamps'), 'asked_mem')
-    df.setValues({t: events[t]['asked_mem'] for t in events.keys()})
-    ampl.setData(df)
-    df = DataFrame(('timestamps'), 'asked_disk')
-    df.setValues({t: events[t]['asked_disk'] for t in events.keys()})
-    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
 
-    # Set leavings
+    print('Dumping asked_mem using amplpy')
+    start = time.time()
+    df = DataFrame(('timestamps'), 'asked_mem')
+    df.setValues({r['time']: r['asked_mem']
+                  for _, r in arrivals_departures.iterrows()})
+    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping asked_disk using amplpy')
+    start = time.time()
+    df = DataFrame(('timestamps'), 'asked_disk')
+    df.setValues({r['time']: r['asked_disk']
+                  for _, r in arrivals_departures.iterrows()})
+    ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping frees_cpu sing amplpy')
+    start = time.time()
     df = DataFrame(('timestamps'), 'frees_cpu')
-    df.setValues({t: events[t]['frees_cpu'] for t in events.keys()})
+    df.setValues({r['time']: r['frees_cpu']
+                  for _, r in arrivals_departures.iterrows()})
     ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping frees_mem sing amplpy')
+    start = time.time()
     df = DataFrame(('timestamps'), 'frees_mem')
-    df.setValues({t: events[t]['frees_mem'] for t in events.keys()})
+    df.setValues({r['time']: r['frees_mem']
+                  for _, r in arrivals_departures.iterrows()})
     ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping frees_disk sing amplpy')
+    start = time.time()
     df = DataFrame(('timestamps'), 'frees_disk')
-    df.setValues({t: events[t]['frees_disk'] for t in events.keys()})
+    df.setValues({r['time']: r['frees_disk']
+                  for _, r in arrivals_departures.iterrows()})
     ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+
+    print('Dumping frees_arrival sing amplpy')
+    start = time.time()
     df = DataFrame(('timestamps'), 'frees_arrival')
-    df.setValues({t: events[t]['frees_arrival'] for t in events.keys()})
+    df.setValues({r['time']: r['frees_arrival']
+                  for _, r in arrivals_departures.iterrows()})
     ampl.setData(df)
+    print(f'It took {time.time() - start} seconds')
+    
+    # Dump to .dat file
+    print(f'Storing data to {args.out}')
     ampl.exportData(datfile=args.out)
 

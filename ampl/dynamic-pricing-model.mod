@@ -1,16 +1,18 @@
-set instances symbolic;
-set timestamps ordered >= 0; # UNIX epoch-1970
+set instance_types;
+set instances;
+set timestamps ordered; # UNIX epoch-1970
 
 # Old parameters 
 #param profit_federate {timestamps};
 #param profit_local {timestamps};
 #param profit_reject {timestamps};
 
+param itype {instances} symbolic;
 param margin; # 0.2 above the federate_fee
-param federate_fee {instances, timestamps};
+param federate_fee {instance_types, timestamps};
 param instance_arrival {instances} in timestamps;
 param instance_departure {instances} >= 0;
-param available {instances, timestamps} binary;
+#param available {instances, timestamps} binary;
 param asked_cpu {timestamps};
 param asked_mem {timestamps};
 param asked_disk {timestamps};
@@ -76,13 +78,14 @@ subject to no_federation_disk_runout {t in timestamps}:
 # Note: as an instance might leave in between [t-1,t]
 #       we compute the profit in between [t-1, min(t,departure)]
 maximize dynamic_profit:
-    sum {t in timestamps, i in instances: available[i,prev(t)] == 1}
+    sum {i in instances, t in timestamps:
+            instance_arrival[i] <= prev(t) and prev(t) <= instance_departure[i]}
         ( min(t, instance_departure[i]) - prev(t) ) / (60*60) *
         (local[instance_arrival[i]] 
-            * (1+margin) * federate_fee[i,instance_arrival[i]]
+            * (1+margin) * federate_fee[itype[i],instance_arrival[i]]
         + federate[instance_arrival[i]] 
-            * ( (1+margin) * federate_fee[i,instance_arrival[i]] 
-                - federate_fee[i,prev(t)] ) );
+            * ( (1+margin) * federate_fee[itype[i],instance_arrival[i]] 
+                - federate_fee[itype[i],prev(t)] ) );
        
          
 
