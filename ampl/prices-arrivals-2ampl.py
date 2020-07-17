@@ -150,6 +150,9 @@ if __name__ == '__main__':
     ##             available[(i,t)] = 1
 
 
+    # Specify the precision to avoid timestamps rounding
+    ampl.setOption('display_eps', 0);
+    ampl.setOption('display_precision', 0);
 
     # Fill the sets
     print('Dumping instance_types using amplpy')
