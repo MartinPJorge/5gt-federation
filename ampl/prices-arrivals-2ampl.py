@@ -71,7 +71,7 @@ if __name__ == '__main__':
         itype[instances[-1]] = instance
         instantiations[instance] += [instances[-1]]
         instance_arrival[instances[-1]] = t
-        instance_departure[instances[-1]] = t + 60*60 * row['lifetime']
+        instance_departure[instances[-1]] = t + 24*60*60 * row['lifetime']
         asked_cpu += [row['cpu']]
         asked_mem += [row['memory']]
         asked_disk += [row['disk']]
@@ -81,7 +81,7 @@ if __name__ == '__main__':
         frees_arrival += [timestamps[0]] # whatever here - freed resources is 0
 
         # Departure event - null instance associated
-        timestamps += [t + 60*60 * row['lifetime']]
+        timestamps += [t + 24*60*60 * row['lifetime']]
         instances += [f'null-{t}']
         itype[instances[-1]] = 'null'
         instantiations['null'] += [instances[-1]]

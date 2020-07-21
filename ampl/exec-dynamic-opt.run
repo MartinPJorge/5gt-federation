@@ -13,7 +13,24 @@ fix federation_mem[first(timestamps)] := 960;
 
 solve;
 
+
+printf "timestamp,instance,local,federate,reject\n" > /tmp/optimal-decisions.csv;
+printf {i in instances} "%f,%s,%d,%d,%d\n",
+    instance_arrival[i], itype[i],
+    local[instance_arrival[i]],
+    federate[instance_arrival[i]],
+    reject[instance_arrival[i]] >> /tmp/optimal-decisions.csv;
+
+printf "timestamp,cpu,mem,disk,fcpu,fmem,fdisk\n" > /tmp/optimal-decisions-resources.csv;
+printf {t in timestamps} "%f,%d,%d,%d,%d,%d,%d\n",
+    t, cpu[t], mem[t], disk[t],
+    federation_cpu[t],
+    federation_mem[t],
+    federation_disk[t] >> /tmp/optimal-decisions-resources.csv;
+    
+
 # Print all variables
+option display_1col 1;
 display local > /tmp/optimal-solution.out;
 display federate >> /tmp/optimal-solution.out;
 display reject >> /tmp/optimal-solution.out;
