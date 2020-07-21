@@ -16,6 +16,11 @@ fix federation_mem[first(timestamps)] := 960;
 ## fix {t in timestamps} local[t];
 ## 
 
+## # force all to be federated
+## let {t in timestamps} federate[t] := 1;
+## fix {t in timestamps} federate[t];
+
+
 solve;
 
 
@@ -26,9 +31,11 @@ printf {i in instances} "%f,%s,%d,%d,%d\n",
     federate[instance_arrival[i]],
     reject[instance_arrival[i]] >> /tmp/optimal-decisions.csv;
 
-printf "timestamp,cpu,mem,disk,fcpu,fmem,fdisk\n" > /tmp/optimal-decisions-resources.csv;
-printf {t in timestamps} "%f,%d,%d,%d,%d,%d,%d\n",
-    t, cpu[t], mem[t], disk[t],
+printf "timestamp,acpu,amem,adisk,\tlocal,fed,reject,\tcpu,mem,disk,\tfcpu,fmem,fdisk\n" > /tmp/optimal-decisions-resources.csv;
+printf {t in timestamps} "%f,%d,%d,%d,\t%d,%d,%d,\t%d,%d,%d,\t%d,%d,%d\n",
+    t, asked_cpu[t], asked_mem[t], asked_disk[t],
+    local[t], federate[t], reject[t],
+    cpu[t], mem[t], disk[t],
     federation_cpu[t],
     federation_mem[t],
     federation_disk[t] >> /tmp/optimal-decisions-resources.csv;

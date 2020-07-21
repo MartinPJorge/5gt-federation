@@ -340,9 +340,10 @@ class AWS_env():
         logging.debug(f'reward={reward}')
         logging.debug(f'pricing={pricing}')
         penalty = 0
-        for end, begin in zip(pricing[:-1], pricing[1:]):
+        for begin, end in zip(pricing[:-1], pricing[1:]):
             delta = (end[0].timestamp() - begin[0].timestamp()) / (60*60) # h
             logging.debug('\t\tpenaly iter')
+            logging.debug(f'\t\t  delta={delta}, begin[1]={begin[1]}')
             penalty += delta * begin[1]
             reward -= delta * begin[1]
         logging.debug(f'\tpenalty={penalty}')
