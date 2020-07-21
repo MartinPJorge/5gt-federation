@@ -10,6 +10,11 @@ fix federation_cpu[first(timestamps)] := 480;
 fix federation_disk[first(timestamps)] := 12000;
 fix federation_mem[first(timestamps)] := 960;
 
+# to DEBUG scenarios with enough local for all
+## # force all to be locally deployed
+## let {t in timestamps} local[t] := 1;
+## fix {t in timestamps} local[t];
+## 
 
 solve;
 

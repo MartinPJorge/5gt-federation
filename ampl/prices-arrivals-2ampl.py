@@ -8,6 +8,10 @@ import pandas as pd
 import time
 
 
+OS='Linux/UNIX' # os to consider for spot prices
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Given arrivals+prices CSVs, ' + \
                                                  'it creates an AMPL .dat file')
@@ -39,6 +43,7 @@ if __name__ == '__main__':
 
     # Open the spot prices
     spot_ = pd.read_csv(args.prices)
+    spot_ = spot_[spot_['ProductDescription'] == OS]
     spot_ = spot_[spot_['InstanceType'].isin(args.instances.split('|'))]
     spot_['Timestamp'] = pd.to_datetime(spot_['Timestamp'])
     spot_.sort_values(by='Timestamp', inplace=True, ascending=True)
@@ -124,12 +129,24 @@ if __name__ == '__main__':
             hi = None if len(h) == 0 or len(hi) == 0 else hi
 
             if type(hi) == type(None):
-                federate_fee[(i_type, t)] = spot_[spot_['InstanceType'] ==\
-                        i_type]['SpotPrice'].iloc[0]\
-                            if i_type != 'null' else 0
+                # federate_fee[(i_type, t)] = spot_[spot_['InstanceType'] ==\
+                #         i_type]['SpotPrice'].iloc[0]\
+                #             if i_type != 'null' else 0
+
+                # Do it as the arrivals generator
+                federate_fee[(i_type,t)] = spot_[(spot_['Timestamp'] <=\
+                             pd.Timestamp(t+24*60*60, unit='s', tz='UTC')) &
+                             (spot_['InstanceType'] ==\
+                                 i_type)]['SpotPrice'].iloc[-1]\
+                             if i_type != 'null' else 0
             else:
                 federate_fee[(i_type, t)] = hi['SpotPrice'].iloc[-1]\
                         if i_type != 'null' else 0
+    print('federate_fee==:')
+    for t in timestamps:
+        print(f't={t}')
+        for it in ['c5d.4xlarge', 'c5.2xlarge', 't3a.small']:
+            print(f'\t{it} fee = {federate_fee[(it,t)]}')
 
 
     # Fill each instance availability
@@ -153,31 +170,33 @@ if __name__ == '__main__':
     # Specify the precision to avoid timestamps rounding
     ampl.setOption('display_eps', 0);
     ampl.setOption('display_precision', 0);
+    ampl.setOption('display_width', 30); # force timestamps to 1 col
+                                         # so they're read ordered
 
     # Fill the sets
-    print('Dumping instance_types using amplpy')
+    print('Dumping instance_types uusing amplpy')
     start = time.time()
     ampl.set['instance_types'] = instance_types
     print(f'It took {time.time() - start} seconds')
-    print('Dumping timestamps using amplpy')
+    print('Dumping timestamps uusing amplpy')
     start = time.time()
     ampl.set['timestamps'] = list(arrivals_departures['time'])
     print(f'It took {time.time() - start} seconds')
-    print('Dumping instances using amplpy')
+    print('Dumping instances uusing amplpy')
     start = time.time()
     ampl.set['instances'] = instances
     print(f'It took {time.time() - start} seconds')
 
 
     # Fill the parameters
-    print('Dumping itypes using amplpy')
+    print('Dumping itypes uusing amplpy')
     start = time.time()
     df = DataFrame(('instances'), 'itype')
     df.setValues({i: itype[i] for i in instances})
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping federate_fee using amplpy')
+    print('Dumping federate_fee uusing amplpy')
     start = time.time()
     df = DataFrame(('instances', 'timestamps'), 'federate_fee')
     df.setValues({(it,t): federate_fee[(it,t)]
@@ -185,28 +204,28 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping instance_arrival using amplpy')
+    print('Dumping instance_arrival uusing amplpy')
     start = time.time()
     df = DataFrame(('instances'), 'instance_arrival')
     df.setValues({i: instance_arrival[i] for i in instance_arrival.keys()})
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping instance_departure using amplpy')
+    print('Dumping instance_departure uusing amplpy')
     start = time.time()
     df = DataFrame(('instances'), 'instance_departure')
     df.setValues({i: instance_departure[i] for i in instance_departure.keys()})
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    ## print('Dumping available using amplpy')
+    ## print('Dumping available uusing amplpy')
     ## start = time.time()
     ## df = DataFrame(('instances', 'timestamps'), 'available')
     ## df.setValues({(i,t): available[(i,t)] for (i,t) in available.keys()})
     ## ampl.setData(df)
     ## print(f'It took {time.time() - start} seconds')
 
-    print('Dumping asked_cpu using amplpy')
+    print('Dumping asked_cpu uusing amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'asked_cpu')
     df.setValues({r['time']: r['asked_cpu']
@@ -214,7 +233,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping asked_mem using amplpy')
+    print('Dumping asked_mem uusing amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'asked_mem')
     df.setValues({r['time']: r['asked_mem']
@@ -222,7 +241,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping asked_disk using amplpy')
+    print('Dumping asked_disk uusing amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'asked_disk')
     df.setValues({r['time']: r['asked_disk']
@@ -230,7 +249,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping frees_cpu sing amplpy')
+    print('Dumping frees_cpu using amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'frees_cpu')
     df.setValues({r['time']: r['frees_cpu']
@@ -238,7 +257,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping frees_mem sing amplpy')
+    print('Dumping frees_mem using amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'frees_mem')
     df.setValues({r['time']: r['frees_mem']
@@ -246,7 +265,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping frees_disk sing amplpy')
+    print('Dumping frees_disk using amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'frees_disk')
     df.setValues({r['time']: r['frees_disk']
@@ -254,7 +273,7 @@ if __name__ == '__main__':
     ampl.setData(df)
     print(f'It took {time.time() - start} seconds')
 
-    print('Dumping frees_arrival sing amplpy')
+    print('Dumping frees_arrival using amplpy')
     start = time.time()
     df = DataFrame(('timestamps'), 'frees_arrival')
     df.setValues({r['time']: r['frees_arrival']

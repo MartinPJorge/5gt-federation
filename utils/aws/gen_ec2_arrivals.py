@@ -12,6 +12,9 @@ from scipy.stats import truncnorm
 from numpy.random import exponential as rexp
 
 
+OS='Linux/UNIX' # os considered to take spot prices
+
+
 
 # Arrival/departure functions below written by Josep Xavier Salvat
 # and adapted by Jorge Martín Pérez
@@ -63,6 +66,7 @@ if __name__ == '__main__':
 
     # Load data
     prices_df = pd.read_csv(args.prices_csv)
+    prices_df = prices_df[prices_df['ProductDescription'] == OS]
     prices_df['Timestamp'] = pd.to_datetime(prices_df['Timestamp'])
     # Parse the instances to be plotted
     instances = list(prices_df['InstanceType'].unique())\

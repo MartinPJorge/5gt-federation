@@ -3,6 +3,8 @@ import math
 import time
 import logging
 
+OS='Linux/UNIX' # considered OS for spot prices
+
 class AWS_env():
     # ACTIONs macros
     A_LOCAL = 0
@@ -47,7 +49,8 @@ class AWS_env():
         # ARRIVAL reward
         self.max_reward = 0
         # SPOT PRICE
-        self.spot_prices = spot_prices
+        self.spot_prices = pd.DataFrame(spot_prices[
+                spot_prices['ProductDescription'] == OS])
         self.spot_prices.sort_values(by='Timestamp', ascending=True,
                                      inplace=True)
         self.spot_prices['Timestamp'] =\
@@ -127,12 +130,10 @@ class AWS_env():
         # returns the reward and next state
         # in case it is the last state, it returns None as state
 
-        # t = t + 1
+        # arrival[t]
         reward = 0
         curr_arrival = self.arrivals.iloc[self.curr_idx]
         curr_time = curr_arrival['time']
-        self.curr_idx += 1
-        next_time = self.arrivals.time.iloc[self.curr_idx]
 
         # Assign the resources based on the action
         asked_cpu = curr_arrival['cpu']
@@ -161,6 +162,10 @@ class AWS_env():
                 self.in_fed.append(self.curr_idx)
         elif action == AWS_env.A_REJECT:
             pass
+
+        # t = t + 1
+        self.curr_idx += 1
+        next_time = self.arrivals.time.iloc[self.curr_idx]
 
         # calculate the reward from [t, t+1]
         reward += self.__calc_reward(curr_time, next_time)
