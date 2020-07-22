@@ -12,8 +12,6 @@ from scipy.stats import truncnorm
 from numpy.random import exponential as rexp
 
 
-OS='Linux/UNIX' # os considered to take spot prices
-
 
 
 # Arrival/departure functions below written by Josep Xavier Salvat
@@ -49,7 +47,11 @@ if __name__ == '__main__':
     parser.add_argument('instance_types', type=str,
                         help='|-separated list of instances: ' +\
                             't3a.nano|t3a.small|...\n' +\
-                            'or * wildcard to plot all')
+                            'or * wildcard to consider all')
+    parser.add_argument('os_types', type=str,
+                        help='|-separated list of OSs: ' +\
+                            'Linux/UNIX|SUSE Linux|...\n' +\
+                            'or * wildcard to consider all')
     parser.add_argument('lf_std', type=float,
                         help='lifetime in lifetime+-lf_std/100')
     parser.add_argument('fee_margin', type=float,
@@ -66,13 +68,23 @@ if __name__ == '__main__':
 
     # Load data
     prices_df = pd.read_csv(args.prices_csv)
-    prices_df = prices_df[prices_df['ProductDescription'] == OS]
     prices_df['Timestamp'] = pd.to_datetime(prices_df['Timestamp'])
     # Parse the instances to be plotted
     instances = list(prices_df['InstanceType'].unique())\
             if args.instance_types == '*' else args.instance_types.split('|')
     # Filter the asked instances
     prices_df = prices_df[prices_df['InstanceType'].isin(instances)]
+    # Filter the requested OSs
+    if args.os_types != '*':
+        if args.instance_types == '*':
+            prices_df = prices_df[prices_df['ProductDescription'].isin(
+                                   args.os_types.split('|'))]
+        else:
+            for i,os in zip(instances, args.os_types.split('|')):
+                print(f'filtering instance={i} and os={os}')
+                prices_df = prices_df[(prices_df['InstanceType'] != i) |
+                                ((prices_df['InstanceType']==i) &
+                                 (prices_df['ProductDescription']==os))]
 
     # Retain the original dataframe to latter query spot prices
     orig_prices_df = pd.DataFrame(prices_df)
@@ -111,6 +123,7 @@ if __name__ == '__main__':
                        instance]['AvgSpotPrice'].max()
         for instance in avg_prices_df['InstanceType'].unique()
     }
+
 
     print('Generating the time arrivals')
     for idx, row in avg_prices_df.iterrows():

@@ -20,6 +20,23 @@ fix federation_mem[first(timestamps)] := 960;
 ## let {t in timestamps} federate[t] := 1;
 ## fix {t in timestamps} federate[t];
 
+## # To monitor instant rewards
+## var profit {t in timestamps};
+## subject to instant_profit_rule {t0 in timestamps}:
+##     profit[t0] =
+##     sum {i in instances, t in timestamps: t <> first(timestamps) and t<=t0 and
+##             instance_arrival[i] <= prev(t) and prev(t) <= instance_departure[i]}
+##         ( min(t, instance_departure[i]) - prev(t) ) / (60*60) *
+##         (local[instance_arrival[i]] 
+##             * (1+margin) * federate_fee[itype[i],instance_arrival[i]]
+##         + federate[instance_arrival[i]] 
+##             * ( (1+margin) * federate_fee[itype[i],instance_arrival[i]] 
+##                 - federate_fee[itype[i],prev(t)] ) );
+## 
+## var instant_profit {t in timestamps};
+## subject to instantaneous_rule {t in timestamps: t <> first(timestamps)}:
+##     instant_profit[t] = profit[t] - profit[prev(t)];
+
 
 solve;
 
