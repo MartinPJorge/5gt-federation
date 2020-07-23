@@ -63,7 +63,7 @@ def greedy(env, out= None):
 
     episode_reward = 0
     tot_actions = 3
-    actions = []
+    states, actions, rewards = [], [], []
     t = 0
     env.reset()
     next_state = env.get_state()
@@ -83,6 +83,8 @@ def greedy(env, out= None):
         start_action = time.time()
         
         reward, next_state = env.take_action(action)
+        states += [next_state]
+        rewards += [reward]
         episode_reward += reward
         # print(f'time action = {time.time() - start_action}')
         # print(f'action={action},reward={reward}, current_state={curr_state},next_state={next_state}')
@@ -96,7 +98,7 @@ def greedy(env, out= None):
     unique, counts = np.unique(actions, return_counts=True)
     total_actions_count = dict(zip(unique, counts))
     
-    return episode_reward, total_actions_count
+    return episode_reward, total_actions_count, states, actions, rewards
 
     
 
@@ -146,7 +148,7 @@ if __name__ == '__main__':
             arrivals=arrivals,
             spot_prices=prices_df)
     
-    reward, actions_count = greedy(env=env, out= None)
+    reward, actions_count, states, actions, rewards = greedy(env=env, out= None)
 
     print("--------------- MAXIMUM PROFITS ---------------")
 
@@ -169,4 +171,7 @@ if __name__ == '__main__':
     # plt.savefig(filename)
 
     # plt.show()
+    print('State|action|reward')
+    for t in range(len(states)):
+        print(f'{states[t]}|{actions[t]}|{rewards[t]}')
     

@@ -184,6 +184,13 @@ def train_q_network(model, k, epsilon_start, epsilon_end, gamma, alpha, M,
         expisode_reward = 0
         epsilon = (episode+1) / M * (epsilon_end - epsilon_start)\
                   + epsilon_start
+	# TODO - hardcoded for TID experiment, decrease until M=50
+        epsilon = (episode+1) / 50 * (epsilon_end - epsilon_start)\
+                  + epsilon_start
+	# TODO - hardcoded to force TID experiment epsilon=0.1 after M=50
+        if episode >= 50:
+            epsilon = epsilon_end
+
 
         t = 0
         while next_state != None:
@@ -267,10 +274,15 @@ def test_q_network(model, k, env):
     while state != None:
         logging.info(f't={t} test')
         # Select the maximum action for the Q(·)
+        logging.info('state sequence')
+        logging.info(state_sequence)
         phi = phi_(state_sequence, k=k)
+        logging.info('phi')
+        logging.info(phi)
         st_q = time.time()
         Q = model(phi)
         logging.info(f'it takes {time.time() - st_q} seconds to feed forward')
+        logging.info(f'Q={Q}')
         actions += [AWS_env.ACTIONS[Q[0].numpy().argmax()]]
 
         # execute selected action in the environment
@@ -393,6 +405,7 @@ if __name__ == '__main__':
     else:
         model = tf.keras.models.load_model(args.in_model)
         states, actions, rewards = test_q_network(model, args.k, env)
+        logging.info(f'actions={actions}')
         logging.info('State|action|reward')
         for t in range(len(states)):
             logging.info(f'{states[t]}|{actions[t]}|{rewards[t]}')
