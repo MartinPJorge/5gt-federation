@@ -46,9 +46,12 @@ class AWS_env():
         self.curr_idx = 0 # current index in the arrivals DataFrame
         self.in_local = [] # list of arrival indexes in local domain
         self.in_fed = [] # list of arrival indexes in federated domain
+        # Pandas time consumption
+        self.pd_time = 0
         # ARRIVAL reward
         self.max_reward = 0
         # SPOT PRICE
+        start = time.time()
         self.spot_prices = pd.DataFrame(spot_prices[
                 spot_prices['ProductDescription'] == OS])
         self.spot_prices.sort_values(by='Timestamp', ascending=True,
@@ -71,6 +74,7 @@ class AWS_env():
             for instance, os in unique_instances[['InstanceType',
                 'ProductDescription']].values
         }
+        self.pd_time += time.time() - start
         # Cache to store the computed pricing intervals
         # Note: the cache is per-time-step basis
         self.pricing_cache = {}
@@ -81,13 +85,16 @@ class AWS_env():
         if self.curr_idx == len(self.arrivals) - 1:
             return None
 
+        start = time.time()
         arrival = self.arrivals.iloc[self.curr_idx]
         instance = arrival['instance']
         arrival_t = pd.Timestamp(arrival['time'], unit='s', tz='UTC')
+        self.pd_time += time.time() - start
 
         self.max_reward = max(self.max_reward, arrival['reward'])
 
         # Find what is the latest spot price for that instance
+        start = time.time()
         spot_price_df = self.spot_prices[
                     self.spot_prices['InstanceType'] == instance]
         # spot_price_df.sort_values(by='Timestamp', ascending=True, inplace=True)
@@ -96,10 +103,13 @@ class AWS_env():
             spot_price = spot_price_df.iloc[0]['SpotPrice']
         else:
             spot_price = past_prices.iloc[-1]['SpotPrice']
+        self.pd_time += time.time() - start
         
         # Update the max spot price for that instance
         if spot_price > self.max_spot_prices[instance]:
+            start = time.time()
             self.max_spot_prices[instance] = spot_price
+            self.pd_time += time.time() - start
 
 
         return [
@@ -132,7 +142,9 @@ class AWS_env():
 
         # arrival[t]
         reward = 0
+        start = time.time()
         curr_arrival = self.arrivals.iloc[self.curr_idx]
+        self.pd_time += time.time() - start
         curr_time = curr_arrival['time']
 
         # Assign the resources based on the action
@@ -165,7 +177,9 @@ class AWS_env():
 
         # t = t + 1
         self.curr_idx += 1
+        start = time.time()
         next_time = self.arrivals.time.iloc[self.curr_idx]
+        self.pd_time += time.time() - start
 
         # calculate the reward from [t, t+1]
         reward += self.__calc_reward(curr_time, next_time)
@@ -217,11 +231,13 @@ class AWS_env():
         #def __get_pricing_intervals(self, prev_time, until, arrival_idx):
 
         # Create timestamp versions for prev and until
+        start = time.time()
         prev_ts = pd.Timestamp(prev_time, unit='s', tz='UTC')
         until_ts = pd.Timestamp(until, unit='s', tz='UTC')
 
         # Get the spot prices history of the arrival instance
         arrival = self.arrivals.iloc[arrival_idx]
+        self.pd_time += time.time() - start
 
         # If the interval has been already computed, return it
         cached_interval = self.__cache_get_interval(arrival['instance'],
@@ -241,7 +257,9 @@ class AWS_env():
         ### # spot_history.sort_values(by='Timestamp', ascending=True, inplace=True)
         ### print(f'\t\tsorting spot prices take {time.time() - tic}')
         spot_history = self.instance_prices[arrival['instance'], arrival['os']]
+        start = time.time()
         spot_historyFst = spot_history.iloc[0]
+        self.pd_time += time.time() - start
 
         # DEBUG the head
         # print('HHEAD')
@@ -250,20 +268,26 @@ class AWS_env():
 
         # until < t1
         if until < spot_historyFst['Timestamp'].timestamp():
+            start = time.time()
             interval = [[prev_ts, spot_historyFst['SpotPrice']],
                     [until_ts, spot_history.iloc[1]['SpotPrice']]]
+            self.pd_time += time.time() - start
             self.pricing_cache[(arrival['instance'], arrival['os'],
                                 prev_ts, until_ts)] = interval
             return interval 
 
         tic = time.time()
+        start = time.time()
         spot_history_until = spot_history[
                                 spot_history['Timestamp'] <= until_ts]
+        self.pd_time += time.time() - start
         logging.debug(f'\t\tfilter until takes {time.time() - tic}')
 
         # prev_time < t1  &  until >= t1
         if prev_ts < spot_historyFst['Timestamp']:
+            start = time.time()
             ret_prices = spot_history_until.values
+            self.pd_time += time.time() - start
             ret_prices = [list(sp_t) for sp_t in ret_prices]
             logging.debug('prev_time < t1  &  until >= t1')
             logging.debug(f'type(ret_prices[0][0])={type(ret_prices[0][0])}')
@@ -280,13 +304,17 @@ class AWS_env():
 
         # prev_time >= t1  &  until >= t1
         tic = time.time()
+        start = time.time()
         spot_history_between = spot_history_until[
                 spot_history_until['Timestamp'] >= prev_ts]
+        self.pd_time += time.time() - start
         logging.debug(f'\t\tfilter after prev takes {time.time() - tic}')
 
         # no tn:  prev_time <= tn <= until
         if len(spot_history_between) == 0:
+            start = time.time()
             spot_history_untilLst = spot_history_until.iloc[-1]
+            self.pd_time += time.time() - start
             interval = [
                 [prev_ts, spot_history_untilLst['SpotPrice']],
                 [until_ts, spot_history_untilLst['SpotPrice']]
@@ -297,7 +325,9 @@ class AWS_env():
 
         # !E tn:  prev_time <= tn <= until
         if len(spot_history_between) == 1:
+            start = time.time()
             spot_history_betweenLst = spot_history_between.iloc[-1]
+            self.pd_time += time.time() - start
             interval = [
                 [prev_ts, spot_history_betweenLst['SpotPrice']],
                 [until_ts, spot_history_betweenLst['SpotPrice']]
@@ -321,11 +351,13 @@ class AWS_env():
     def __calc_arrival_reward(self, prev_time, curr_time, arrival_idx,
                               federated):
         # Compute the reward
+        start = time.time()
         arrival = self.arrivals.iloc[arrival_idx]
         t_end = arrival['lifetime']*24*60*60 + arrival['time']
         until = min(t_end, curr_time)
         reward = self.arrivals.iloc[arrival_idx]['reward'] *\
                  (until - prev_time) / (60*60) 
+        self.pd_time += time.time() - start
 
         if not federated:
             return reward
@@ -379,15 +411,19 @@ class AWS_env():
 
         # Check local arrivals that have expired
         for local_idx in self.in_local:
+            start = time.time()
             expires = self.arrivals.iloc[local_idx]['time'] +\
                 self.arrivals.iloc[local_idx]['lifetime']*24*60*60
+            self.pd_time += time.time() - start
             if expires <= curr_time:
                 remove_local.append(local_idx)
 
         # Check federated arrivals that have expired
         for fed_idx in self.in_fed:
+            start = time.time()
             expires = self.arrivals.iloc[fed_idx]['time'] +\
                 self.arrivals.iloc[fed_idx]['lifetime']*24*60*60
+            self.pd_time += time.time() - start
             if expires <= curr_time:
                 remove_fed.append(fed_idx)
 
@@ -411,3 +447,6 @@ class AWS_env():
     def reset(self):
         self.__free_resources(curr_time=AWS_env.FUTURE.timestamp())
         self.curr_idx = 0
+
+    def time_in_pandas(self):
+        return self.pd_time

@@ -394,17 +394,27 @@ if __name__ == '__main__':
 
     # Create the Q-network #### TRAIN
     if args.train == True:
+        tic = time.time()
         model = create_q_network(k=args.k)
         epi_rewards = train_q_network(model=model, k=args.k,
                 epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
                 gamma=args.gamma, alpha=args.alpha, M=args.M,
                 batch_size=args.batch, N=args.N, env=env, out=args.out_model)
+        tac = time.time()
+        logging.info(f'Training time = {tac -tic} seconds')
+        logging.info(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
         logging.info('== EPISODE REWARDS ==')
         logging.info(epi_rewards)
     # Load the Q-network   #### TEST
     else:
+        tic = time.time()
         model = tf.keras.models.load_model(args.in_model)
+        tac = time.time()
+        logging.info(f'Loading TF model takes {tac -tic} seconds')
         states, actions, rewards = test_q_network(model, args.k, env)
+        tac = time.time()
+        logging.info(f'Testing time = {tac -tic} seconds')
+        logging.info(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
         logging.info(f'actions={actions}')
         logging.info('State|action|reward')
         for t in range(len(states)):

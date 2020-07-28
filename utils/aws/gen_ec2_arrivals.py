@@ -123,14 +123,26 @@ if __name__ == '__main__':
                        instance]['AvgSpotPrice'].max()
         for instance in avg_prices_df['InstanceType'].unique()
     }
+    # Get minimum spot prices
+    min_spot_price = {
+        instance: avg_prices_df[avg_prices_df['InstanceType'] ==\
+                       instance]['AvgSpotPrice'].min()
+        for instance in avg_prices_df['InstanceType'].unique()
+    }
+
+    for i in min_spot_price.keys():
+        print(f'{i} max_spot_price={max_spot_price[i]}')
+        print(f'{i} min_spot_price={min_spot_price[i]}')
 
 
     print('Generating the time arrivals')
     for idx, row in avg_prices_df.iterrows():
         instance_info = instances_info[row['InstanceType']]
         print('Generating arrivals for ' + row['InstanceType'])
-        arrival_rate = fArrival(p=row['AvgSpotPrice'] /\
-                                    max_spot_price[row['InstanceType']],
+        arrival_rate = fArrival(p=(row['AvgSpotPrice'] -\
+                                    min_spot_price[row['InstanceType']]) /\
+                                (min_spot_price[row['InstanceType']] -\
+                                 max_spot_price[row['InstanceType']]),
                                 k=instance_info['fk'], a=instance_info['fa'],
                                 b=instance_info['fb'])
         instance_prices = orig_prices_df[orig_prices_df['InstanceType'] ==\

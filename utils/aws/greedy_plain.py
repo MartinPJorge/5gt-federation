@@ -148,7 +148,11 @@ if __name__ == '__main__':
             arrivals=arrivals,
             spot_prices=prices_df)
     
+    tic = time.time()
     reward, actions_count, states, actions, rewards = greedy(env=env, out= None)
+    tac = time.time()
+    print(f'Testing time = {tac -tic} seconds')
+    print(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
 
     print("--------------- MAXIMUM PROFITS ---------------")
 

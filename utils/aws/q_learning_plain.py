@@ -252,14 +252,22 @@ if __name__ == '__main__':
 
 
     if args.train == True:
+        tic = time.time()
         episode_reward = q_learning(env=env, alpha= args.alpha,
                 discount=args.gamma, episodes= args.M, out= args.out_model,
                 epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end)
+        tac = time.time()
+        logging.info(f'Training time = {tac -tic} seconds')
+        logging.info(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
     else:
         with open(args.in_model, 'r') as fp:
             qtable = json.load(fp)
         qtable = {eval(st): qtable[st] for st in qtable.keys()}
+        tic = time.time()
         states, actions, rewards = test_q_table(qtable, env)
+        tac = time.time()
+        logging.info(f'Testing time = {tac -tic} seconds')
+        logging.info(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
         logging.info('State|action|reward')
         for t in range(len(states)):
             logging.info(f'{states[t]}|{actions[t]}|{rewards[t]}')
