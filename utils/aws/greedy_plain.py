@@ -63,7 +63,7 @@ def greedy(env, out= None):
 
     episode_reward = 0
     tot_actions = 3
-    states, actions, rewards = [], [], []
+    states, actions, rewards, usages = [], [], [], []
     t = 0
     env.reset()
     next_state = env.get_state()
@@ -82,6 +82,7 @@ def greedy(env, out= None):
         print(f'Action taken={action}')
         start_action = time.time()
         
+        usages += [env.get_usage()]
         reward, next_state = env.take_action(action)
         states += [next_state]
         rewards += [reward]
@@ -98,7 +99,7 @@ def greedy(env, out= None):
     unique, counts = np.unique(actions, return_counts=True)
     total_actions_count = dict(zip(unique, counts))
     
-    return episode_reward, total_actions_count, states, actions, rewards
+    return episode_reward, total_actions_count, states, actions, rewards, usages
 
     
 
@@ -149,7 +150,7 @@ if __name__ == '__main__':
             spot_prices=prices_df)
     
     tic = time.time()
-    reward, actions_count, states, actions, rewards = greedy(env=env, out= None)
+    reward, actions_count, states, actions, rewards, usages = greedy(env=env, out= None)
     tac = time.time()
     print(f'Testing time = {tac -tic} seconds')
     print(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
@@ -175,7 +176,19 @@ if __name__ == '__main__':
     # plt.savefig(filename)
 
     # plt.show()
-    print('State|action|reward')
+    # header for resources usage per instance
+    usage_str = ''
+    for i in env.get_instances():
+        usage_str += f'|%{i}_cpus'
+        usage_str += f'|%{i}_mems'
+        usage_str += f'|%{i}_disks'
+        usage_str += f'|%{i}_cpus_fed'
+        usage_str += f'|%{i}_mems_fed'
+        usage_str += f'|%{i}_disks_fed'
+    print('State|action|reward' + usage_str)
     for t in range(len(states)):
-        print(f'{states[t]}|{actions[t]}|{rewards[t]}')
-    
+        t_str = f'{states[t]}|{actions[t]}|{rewards[t]}'
+        for instance_usage in usages[t]:
+            t_str += '|' + '|'.join(str(u) for u in instance_usage)
+        print(t_str)
+

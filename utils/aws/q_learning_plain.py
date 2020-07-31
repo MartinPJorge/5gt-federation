@@ -137,7 +137,7 @@ def test_q_table(qtable, env):
     # returns: the SAR, i.e, sequences, actions, rewards
 
     env.reset()
-    rewards, actions = [], []
+    rewards, actions, usages = [], [], []
     state = env.get_state()
     state_sequence = [state]
 
@@ -150,13 +150,14 @@ def test_q_table(qtable, env):
 
         # execute selected action in the environment
         st_a = time.time()
+        usages += [env.get_usage()]
         reward, state = env.take_action(actions[-1])
         logging.info(f'it takes {time.time() - st_a} seconds to act')
         rewards += [reward]
         state_sequence += [state]
         t += 1
 
-    return state_sequence[-(len(actions)+1):-1], actions, rewards
+    return state_sequence[-(len(actions)+1):-1], actions, rewards, usages
     
 
 
@@ -264,13 +265,25 @@ if __name__ == '__main__':
             qtable = json.load(fp)
         qtable = {eval(st): qtable[st] for st in qtable.keys()}
         tic = time.time()
-        states, actions, rewards = test_q_table(qtable, env)
+        states, actions, rewards, usages = test_q_table(qtable, env)
         tac = time.time()
         logging.info(f'Testing time = {tac -tic} seconds')
         logging.info(f'AWS_env pandas time = {env.time_in_pandas()} seconds')
-        logging.info('State|action|reward')
+        # header for resources usage per instance
+        usage_str = ''
+        for i in env.get_instances():
+            usage_str += f'|%{i}_cpus'
+            usage_str += f'|%{i}_mems'
+            usage_str += f'|%{i}_disks'
+            usage_str += f'|%{i}_cpus_fed'
+            usage_str += f'|%{i}_mems_fed'
+            usage_str += f'|%{i}_disks_fed'
+        logging.info('State|action|reward' + usage_str)
         for t in range(len(states)):
-            logging.info(f'{states[t]}|{actions[t]}|{rewards[t]}')
+            t_str = f'{states[t]}|{actions[t]}|{rewards[t]}'
+            for instance_usage in usages[t]:
+                t_str += '|' + '|'.join(str(u) for u in instance_usage)
+            logging.info(t_str)
         sys.exit(0)
 
     max_profit = max(episode_reward)

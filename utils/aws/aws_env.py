@@ -79,6 +79,33 @@ class AWS_env():
         # Note: the cache is per-time-step basis
         self.pricing_cache = {}
 
+        # Store resources consumed per instance
+        self.used_local_cpu = {i: 0 for i in self.max_spot_prices.keys()}
+        self.used_local_mem = {i: 0 for i in self.max_spot_prices.keys()}
+        self.used_local_disk = {i: 0 for i in self.max_spot_prices.keys()}
+        self.used_fed_cpu = {i: 0 for i in self.max_spot_prices.keys()}
+        self.used_fed_mem = {i: 0 for i in self.max_spot_prices.keys()}
+        self.used_fed_disk = {i: 0 for i in self.max_spot_prices.keys()}
+
+    def get_instances(self):
+        return self.max_spot_prices.keys()
+
+
+    def get_usage(self):
+        if self.curr_idx == len(self.arrivals) - 1:
+            return None
+
+        return [
+            [
+                self.used_local_cpu[i]  / self.max_cpu,
+                self.used_local_mem[i]  / self.max_memory,
+                self.used_local_disk[i] / self.max_disk,
+                self.used_fed_cpu[i]    / self.max_f_cpu,
+                self.used_fed_mem[i]    / self.max_f_memory,
+                self.used_fed_disk[i]   / self.max_f_disk
+            ]
+            for i in self.get_instances()
+        ]
 
 
     def get_state(self):
@@ -151,6 +178,7 @@ class AWS_env():
         asked_cpu = curr_arrival['cpu']
         asked_memory = curr_arrival['memory']
         asked_disk = curr_arrival['disk']
+        instance_t = curr_arrival['instance']
         logging.debug(f'asked resources = (CPU={asked_cpu}, mem={asked_memory},disk={asked_disk})')
         if action == AWS_env.A_LOCAL:
             if self.cpu < asked_cpu or self.memory < asked_memory or\
@@ -162,6 +190,9 @@ class AWS_env():
                 self.memory -= asked_memory
                 self.disk -= asked_disk
                 self.in_local.append(self.curr_idx)
+                self.used_local_cpu[instance_t] += asked_cpu
+                self.used_local_mem[instance_t] += asked_memory
+                self.used_local_disk[instance_t] += asked_disk
         elif action == AWS_env.A_FEDERATE:
             if self.f_cpu < asked_cpu or self.f_memory < asked_memory or\
                     self.f_disk < asked_disk:
@@ -171,6 +202,9 @@ class AWS_env():
                 self.f_cpu -= asked_cpu
                 self.f_memory -= asked_memory
                 self.f_disk -= asked_disk
+                self.used_fed_cpu[instance_t] += asked_cpu
+                self.used_fed_mem[instance_t] += asked_memory
+                self.used_fed_disk[instance_t] += asked_disk
                 self.in_fed.append(self.curr_idx)
         elif action == AWS_env.A_REJECT:
             pass
@@ -432,16 +466,31 @@ class AWS_env():
             logging.debug(f'remove local idx = {rem_loc_idx}')
             logging.debug(f'loc list= {self.in_local}')
             del self.in_local[self.in_local.index(rem_loc_idx)]
-            self.cpu    += self.arrivals.iloc[rem_loc_idx]['cpu']
-            self.disk   += self.arrivals.iloc[rem_loc_idx]['disk']
-            self.memory += self.arrivals.iloc[rem_loc_idx]['memory']
+            # Freed resources
+            free_cpu = self.arrivals.iloc[rem_loc_idx]['cpu']
+            free_mem = self.arrivals.iloc[rem_loc_idx]['memory']
+            free_disk = self.arrivals.iloc[rem_loc_idx]['disk']
+            free_instance = self.arrivals.iloc[rem_loc_idx]['instance']
+            self.cpu    += free_cpu
+            self.memory += free_mem
+            self.disk   += free_disk
+            self.used_local_cpu[free_instance] -= free_cpu
+            self.used_local_mem[free_instance] -= free_mem
+            self.used_local_disk[free_instance] -= free_disk
         for rem_fed_idx in remove_fed:
             logging.debug(f'remove federeated idx = {rem_fed_idx}')
             logging.debug(f'fed list= {self.in_fed}')
             del self.in_fed[self.in_fed.index(rem_fed_idx)]
-            self.f_cpu    += self.arrivals.iloc[rem_fed_idx]['cpu']
-            self.f_disk   += self.arrivals.iloc[rem_fed_idx]['disk']
-            self.f_memory += self.arrivals.iloc[rem_fed_idx]['memory']
+            free_cpu = self.arrivals.iloc[rem_fed_idx]['cpu']
+            free_mem = self.arrivals.iloc[rem_fed_idx]['memory']
+            free_disk = self.arrivals.iloc[rem_fed_idx]['disk']
+            free_instance = self.arrivals.iloc[rem_fed_idx]['instance']
+            self.f_cpu    += free_cpu
+            self.f_disk   += free_disk
+            self.f_memory += free_mem
+            self.used_fed_cpu[free_instance] -= free_cpu
+            self.used_fed_mem[free_instance] -= free_mem
+            self.used_fed_disk[free_instance] -= free_disk
 
 
     def reset(self):
