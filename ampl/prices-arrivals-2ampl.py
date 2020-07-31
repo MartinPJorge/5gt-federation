@@ -134,11 +134,17 @@ if __name__ == '__main__':
                 #             if i_type != 'null' else 0
 
                 # Do it as the arrivals generator
-                federate_fee[(i_type,t)] = spot_[(spot_['Timestamp'] <=\
-                             pd.Timestamp(t+24*60*60, unit='s', tz='UTC')) &
-                             (spot_['InstanceType'] ==\
-                                 i_type)]['SpotPrice'].iloc[-1]\
-                             if i_type != 'null' else 0
+                next_spot, days = [], 1
+                if i_type != 'null':
+                    while len(next_spot) < 1:
+                        next_spot = spot_[(spot_['Timestamp'] <=\
+                        	     pd.Timestamp(t+days*24*60*60, unit='s', tz='UTC')) &
+                        	     (spot_['InstanceType'] ==\
+                        		 i_type)]['SpotPrice']
+                        days += 1
+                    federate_fee[(i_type,t)] = next_spot.iloc[-1]
+                else:
+                    federate_fee[(i_type,t)] = 0
             else:
                 federate_fee[(i_type, t)] = hi['SpotPrice'].iloc[-1]\
                         if i_type != 'null' else 0
