@@ -31,6 +31,7 @@ var disk {timestamps};
 var federation_cpu {timestamps};
 var federation_mem {timestamps};
 var federation_disk {timestamps};
+var instant_reward {timestamps};
 
 # Local resource conservation
 subject to match_cpu {t in timestamps: first(timestamps) <> t}:
@@ -75,18 +76,25 @@ subject to no_federation_disk_runout {t in timestamps}:
     federation_disk[t] >= 0;
 
 
-# Note: as an instance might leave in between [t-1,t]
-#       we compute the profit in between [t-1, min(t,departure)]
-maximize dynamic_profit:
-    sum {i in instances, t in timestamps: t <> first(timestamps) and
-            instance_arrival[i] <= prev(t) and prev(t) <= instance_departure[i]}
+
+subject to delayed_reward {t in timestamps: t <> first(timestamps)}:
+    instant_reward[t] =
+    sum {i in instances: instance_arrival[i] <= prev(t) and
+                         prev(t) <= instance_departure[i]}
         ( min(t, instance_departure[i]) - prev(t) ) / (60*60) *
         (local[instance_arrival[i]] 
             * (1+margin) * federate_fee[itype[i],instance_arrival[i]]
         + federate[instance_arrival[i]] 
             * ( (1+margin) * federate_fee[itype[i],instance_arrival[i]] 
                 - federate_fee[itype[i],prev(t)] ) );
-       
+
+
+
+
+# Note: as an instance might leave in between [t-1,t]
+#       we compute the profit in between [t-1, min(t,departure)]
+maximize dynamic_profit:
+    sum {t in timestamps: t <> first(timestamps)} instant_reward[t];
          
 
 # Old profit function

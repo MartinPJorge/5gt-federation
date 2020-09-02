@@ -39,6 +39,7 @@ fix federation_mem[first(timestamps)] := 960;
 
 
 solve;
+display _total_solve_time;
 
 
 printf "timestamp,instance,local,federate,reject\n" > /tmp/optimal-decisions.csv;
@@ -85,8 +86,31 @@ display frees_mem >> /tmp/optimal-solution.out;
 display frees_disk >> /tmp/optimal-solution.out;
 display frees_arrival >> /tmp/optimal-solution.out;
 display dynamic_profit >> /tmp/optimal-solution.out;
+display instant_reward >> /tmp/optimal-solution.out;
 
 
 
-
+# Print the SARSA file
+delete cpu2xl;
+delete mem2xl;
+delete disk2xl;
+delete cpu2xf;
+delete mem2xf;
+delete disk2xf;
+delete cpu4xl;
+delete mem4xl;
+delete disk4xl;
+delete cpu4xf;
+delete mem4xf;
+delete disk4xf;
+delete cpuSl;
+delete memSl;
+delete diskSl;
+delete cpuSf;
+delete memSf;
+delete diskSf;
+delete t0;
+delete action_;
+delete kinda;
+include print-time-status.run;
 

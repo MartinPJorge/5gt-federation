@@ -1,0 +1,202 @@
+# Auxiliary variables to store used resources
+# over time
+#
+# c5.2xlarge resources
+var cpu2xl;
+var mem2xl;
+var disk2xl;
+var cpu2xf;
+var mem2xf;
+var disk2xf;
+# c5d.4xlarge resources
+var cpu4xl;
+var mem4xl;
+var disk4xl;
+var cpu4xf;
+var mem4xf;
+var disk4xf;
+# t3a.small resources
+var cpuSl;
+var memSl;
+var diskSl;
+var cpuSf;
+var memSf;
+var diskSf;
+
+# Action variable
+var action_;
+# Flag to detect null instances
+param kinda symbolic;
+
+
+for {t0 in timestamps: t0 > first(timestamps)} {
+
+    # t3a.small local resources
+    let cpuSl := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let memSl := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let diskSl := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+    
+    
+    # t3a.small federated resources
+    let cpuSf := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let memSf := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let diskSf := sum {i in instances:
+        itype[i]=="t3a.small" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+    
+    
+    
+    # c5.2xlarge local resources
+    let cpu2xl := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let mem2xl := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let disk2xl := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+    
+    
+    # c5.2xlarge federated resources
+    let cpu2xf := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let mem2xf := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let disk2xf := sum {i in instances:
+        itype[i]=="c5.2xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+    
+    
+    
+    
+    # c5d.4xlarge local resources
+    let cpu4xl := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let mem4xl := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let disk4xl := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        local[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+    
+    
+    # c5d.4xlarge federated resources
+    let cpu4xf := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_cpu[instance_arrival[i]];
+    let mem4xf := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_mem[instance_arrival[i]];
+    let disk4xf := sum {i in instances:
+        itype[i]=="c5d.4xlarge" and
+        instance_arrival[i]<=t0 and
+        t0<instance_departure[i] and
+        federate[instance_arrival[i]]==1}
+     asked_disk[instance_arrival[i]];
+
+    # Store the taken action
+    if reject[t0] = 1 then let action_ := 0;
+    else if local[t0] = 1 then let action_ := 1;
+    else let action_ := 2;
+
+    # detect if the instance arriving at t0 is a null instance
+    if asked_cpu[t0] = 0 then let kinda := 'null';
+    else let kinda := 'notnull';
+
+    ##################
+    # Print the line #
+    ##################
+    printf "%f|[_, _, _, _, _, _, _, _, _, _, _]|%d|%f|",
+      t0, action_, instant_reward[t0] >> /tmp/ampl-sarsa-2.csv;
+    # c5.2xlarge 
+    printf "%f|%f|%f|%f|%f|%f|",
+      cpu2xl/cpu[first(timestamps)],
+      mem2xl/mem[first(timestamps)],
+      disk2xl/disk[first(timestamps)],
+      cpu2xf /federation_cpu[first(timestamps)],
+      mem2xf /federation_mem[first(timestamps)],
+      disk2xf/federation_disk[first(timestamps)] >> /tmp/ampl-sarsa-2.csv;
+    # c5d.4xlarge 
+    printf "%f|%f|%f|%f|%f|%f|",
+      cpu4xl/cpu[first(timestamps)],
+      mem4xl/mem[first(timestamps)],
+      disk4xl/disk[first(timestamps)],
+      cpu4xf /federation_cpu[first(timestamps)],
+      mem4xf /federation_mem[first(timestamps)],
+      disk4xf/federation_disk[first(timestamps)] >> /tmp/ampl-sarsa-2.csv;
+    # t3a.small
+    printf "%f|%f|%f|%f|%f|%f|%s\n",
+      cpuSl/cpu[first(timestamps)],
+      memSl/mem[first(timestamps)],
+      diskSl/disk[first(timestamps)],
+      cpuSf /federation_cpu[first(timestamps)],
+      memSf /federation_mem[first(timestamps)],
+      diskSf/federation_disk[first(timestamps)],
+      kinda >> /tmp/ampl-sarsa-2.csv;
+
+}
