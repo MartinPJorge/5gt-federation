@@ -18,7 +18,7 @@ from numpy.random import exponential as rexp
 # and adapted by Jorge Martín Pérez
 
 
-def fArrival(p, P=0.5, k=2, a=2, b=0.5):
+def fArrival(p, P=0.5, k=2, a=2, b=0.5, delta=4):
     # Users' Arrival function based on the price they
     # pay (rho)
     # arrival rate function depending on the spot price and
@@ -29,22 +29,24 @@ def fArrival(p, P=0.5, k=2, a=2, b=0.5):
     # a, b are parameters of the arrival rate function
     # P is the marginal benefit
     # p is the normalized spot price [0, 1]
+    # delta is the divergence between margins, delta=0
+    #       a high delta leads to less arrivals for high margins
     #
-    # returns: k(1 - ((1+P)/(1+0.5)*p)**a)**b
+    # returns: rho(p,P)=(1+P)/(1+0.5) * (p+delta)/(1+delta) - 2/3
+    #          k(1 - rho(p,P)**a)**b
     #
     # author: inspired on Josep Xavier Salvat function
     #         changes it to consider for marginal benefit
     #         charged over the spot price value
 
-    # Prevent normalized user price above 1
-    if ( (1+P)/(1+0.5)*p )**a >= 1:
-        return 0
+    rho = ((1+P)/(1+0.5) * (p+delta)/(1+delta)) - 2/3
 
+    # Prevent normalized user price above 1
     # Truncate to zero when normalized price is above 1
-    if p >= 1:
+    if rho**a >= 1 or p >= 1:
         return 0
     
-    return float(k*((1- ((1+P)/(1+0.5)*p)**a )**b))
+    return float(k*((1- rho**a )**b))
 
 
 def gDeparture(p, k=2, a=2, b=0.5):
