@@ -18,12 +18,33 @@ from numpy.random import exponential as rexp
 # and adapted by Jorge Martín Pérez
 
 
-def fArrival(p, k=2, a=2, b=0.5):
-    #arrival rate function depending on the price
-    #k is the maximum arrival rate
-    #a, b are parameters of the arrival rate function
-    #p is the price [0, 1]
-    return float(k*((1-p**a)**b))
+def fArrival(p, P=0.5, k=2, a=2, b=0.5):
+    # Users' Arrival function based on the price they
+    # pay (rho)
+    # arrival rate function depending on the spot price and
+    # marginal benefit (P). If p' was the unormalized
+    # spot price, then (1+P)p' is the price set for users to pay.
+    #
+    # k is the maximum arrival rate
+    # a, b are parameters of the arrival rate function
+    # P is the marginal benefit
+    # p is the normalized spot price [0, 1]
+    #
+    # returns: k(1 - ((1+P)/(1+0.5)*p)**a)**b
+    #
+    # author: inspired on Josep Xavier Salvat function
+    #         changes it to consider for marginal benefit
+    #         charged over the spot price value
+
+    # Prevent normalized user price above 1
+    if ( (1+P)/(1+0.5)*p )**a >= 1:
+        return 0
+
+    # Truncate to zero when normalized price is above 1
+    if p >= 1:
+        return 0
+    
+    return float(k*((1- ((1+P)/(1+0.5)*p)**a )**b))
 
 
 def gDeparture(p, k=2, a=2, b=0.5):
@@ -143,6 +164,7 @@ if __name__ == '__main__':
                                     min_spot_price[row['InstanceType']]) /\
                                 (min_spot_price[row['InstanceType']] -\
                                  max_spot_price[row['InstanceType']]),
+                                P=args.fee_margin,
                                 k=instance_info['fk'], a=instance_info['fa'],
                                 b=instance_info['fb'])
         instance_prices = orig_prices_df[orig_prices_df['InstanceType'] ==\
