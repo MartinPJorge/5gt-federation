@@ -16,37 +16,53 @@ from numpy.random import exponential as rexp
 
 # Arrival/departure functions below written by Josep Xavier Salvat
 # and adapted by Jorge Martín Pérez
+# [TID] Information Exchange to Support Multi-Domain Slice Service Provision for 5G/NFV
 
 
-def fArrival(p, P=0.5, k=2, a=2, b=0.5, delta=4):
+def fArrival(p, P=0.5, k=2, a=2, b=0.5, M=2, m=1):
     # Users' Arrival function based on the price they
     # pay (rho)
     # arrival rate function depending on the spot price and
     # marginal benefit (P). If p' was the unormalized
     # spot price, then (1+P)p' is the price set for users to pay.
     #
-    # k is the maximum arrival rate
+    # k is the maximum arrival rate, achieved when p=m
     # a, b are parameters of the arrival rate function
     # P is the marginal benefit
-    # p is the normalized spot price [0, 1]
-    # delta is the divergence between margins, delta=0
-    #       a high delta leads to less arrivals for high margins
+    # p is the spot price 
+    # m is the minimum spot price
+    # M is the maximum spot price
     #
-    # returns: rho(p,P)=(1+P)/(1+0.5) * (p+delta)/(1+delta) - 2/3
+    # returns: rho(p,P)=((1+P)*p+P)/2
     #          k(1 - rho(p,P)**a)**b
     #
     # author: inspired on Josep Xavier Salvat function
     #         changes it to consider for marginal benefit
     #         charged over the spot price value
 
-    rho = ((1+P)/(1+0.5) * (p+delta)/(1+delta)) - 2/3
+    rho = (1+P)*p
+
 
     # Prevent normalized user price above 1
     # Truncate to zero when normalized price is above 1
-    if rho**a >= 1 or p >= 1:
+    if rho/(2*M) > 1 or p > M:
         return 0
     
-    return float(k*((1- rho**a )**b))
+    # TODO: improve the normalization by setting parameters
+    # we normalize k so it maps to f(p=m, P=0.5)=k
+    return float(k/(1+(rho-m)/(2*M-m)) * (1- (rho/(2*M))**a )**b)
+
+
+def what_fk(a, b, tid, m, M):
+    # Given [TID] reference values of arriving instances
+    # this function returns the k such that
+    # fArrival(k, a, b, ((1+0.5)*p-m)/(2M-m)=0.5) = tid
+    # i.e., such that the arrival rate is tid when the
+    # user price (1+P)p is on the avg. with P=0.5
+
+    # rho=(1+P)p
+    rho0 = (2*M+m)/2 # this comes from (rho0-m)/(2M-m)=1/2
+    return (tid * (1 + (rho0-m)/(2*M-m))) / (1 - (rho0/(2*M))**a)**b
 
 
 def gDeparture(p, k=2, a=2, b=0.5):
@@ -157,17 +173,23 @@ if __name__ == '__main__':
         print(f'{i} max_spot_price={max_spot_price[i]}')
         print(f'{i} min_spot_price={min_spot_price[i]}')
 
+    # Derive the k parameter for each fArrival()
+    for i in min_spot_price.keys():
+        instance_info = instances_info[i]
+        instance_info['fk'] = what_fk(a=instance_info['fa'],
+                b=instance_info['fb'], tid=instance_info['ftid'],
+                m=min_spot_price[i], M=max_spot_price[i])
 
     print('Generating the time arrivals')
     for idx, row in avg_prices_df.iterrows():
         instance_info = instances_info[row['InstanceType']]
         print('Generating arrivals for ' + row['InstanceType'])
-        arrival_rate = fArrival(p=(row['AvgSpotPrice'] -\
-                                    min_spot_price[row['InstanceType']]) /\
-                                (min_spot_price[row['InstanceType']] -\
-                                 max_spot_price[row['InstanceType']]),
+        arrival_rate = fArrival(p=row['AvgSpotPrice'],
+                                m=min_spot_price[row['InstanceType']],
+                                M=max_spot_price[row['InstanceType']],
                                 P=args.fee_margin,
-                                k=instance_info['fk'], a=instance_info['fa'],
+                                k=instance_info['fk'],
+                                a=instance_info['fa'],
                                 b=instance_info['fb'])
         instance_prices = orig_prices_df[orig_prices_df['InstanceType'] ==\
                                             row['InstanceType']]
