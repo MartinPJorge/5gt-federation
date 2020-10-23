@@ -19,7 +19,7 @@ from numpy.random import exponential as rexp
 # [TID] Information Exchange to Support Multi-Domain Slice Service Provision for 5G/NFV
 
 
-def fArrival(p, P=0.5, k=2, a=2, b=0.5, M=2, m=1):
+def fArrival(p, P=0.2, k=2, a=2, b=0.5, M=2, m=1):
     # Users' Arrival function based on the price they
     # pay (rho)
     # arrival rate function depending on the spot price and
@@ -33,8 +33,8 @@ def fArrival(p, P=0.5, k=2, a=2, b=0.5, M=2, m=1):
     # m is the minimum spot price
     # M is the maximum spot price
     #
-    # returns: rho(p,P)=((1+P)*p+P)/2
-    #          k(1 - rho(p,P)**a)**b
+    # returns: rho(p,P)=(1+P)*p
+    #          k(1 - (rho(p,P)/M)**a)**b
     #
     # author: inspired on Josep Xavier Salvat function
     #         changes it to consider for marginal benefit
@@ -42,27 +42,23 @@ def fArrival(p, P=0.5, k=2, a=2, b=0.5, M=2, m=1):
 
     rho = (1+P)*p
 
-
-    # Prevent normalized user price above 1
     # Truncate to zero when normalized price is above 1
-    if rho/(2*M) > 1 or p > M:
+    if rho > M:
         return 0
     
-    # TODO: improve the normalization by setting parameters
-    # we normalize k so it maps to f(p=m, P=0.5)=k
-    return float(k/(1+(rho-m)/(2*M-m)) * (1- (rho/(2*M))**a )**b)
+    return float(k * (1- (rho/M)**a )**b)
 
 
-def what_fk(a, b, tid, m, M):
+def what_fk(a, b, tid, minst, Minst, M):
     # Given [TID] reference values of arriving instances
     # this function returns the k such that
-    # fArrival(k, a, b, ((1+0.5)*p-m)/(2M-m)=0.5) = tid
+    # fArrival(k, a, b, p=(Minst+minst)/(2M)) = tid
     # i.e., such that the arrival rate is tid when the
-    # user price (1+P)p is on the avg. with P=0.5
-
-    # rho=(1+P)p
-    rho0 = (2*M+m)/2 # this comes from (rho0-m)/(2M-m)=1/2
-    return (tid * (1 + (rho0-m)/(2*M-m))) / (1 - (rho0/(2*M))**a)**b
+    # spot price p is on the avg. (Minst+minst)/2 with P=0
+    # with minst and Minst being the minimum/maximum
+    # spot instace price, respectively
+    mid = (minst+Minst)/2
+    return tid / (1 - (mid/M)**a)**b
 
 
 def gDeparture(p, k=2, a=2, b=0.5):
@@ -97,6 +93,8 @@ if __name__ == '__main__':
                         help='0.n fee price above the spot price percentage')
     parser.add_argument('out', type=str, default='/tmp/ec2-arrivals.csv',
                         help='Path of the CSV where EC2 arrivals are stored')
+    parser.add_argument('--M', type=float,
+                        help='maximum spot price to use')
     args = parser.parse_args()
 
 
@@ -173,12 +171,19 @@ if __name__ == '__main__':
         print(f'{i} max_spot_price={max_spot_price[i]}')
         print(f'{i} min_spot_price={min_spot_price[i]}')
 
+    # Derive maximum spot price among instances
+    M = 2 * max([max_spot_price[r['InstanceType']]\
+            for _,r in avg_prices_df.iterrows()])\
+        if not args.M else 2*args.M
+    print(f'M={M}, 0.5M={0.5*M}')
+
     # Derive the k parameter for each fArrival()
     for i in min_spot_price.keys():
         instance_info = instances_info[i]
         instance_info['fk'] = what_fk(a=instance_info['fa'],
                 b=instance_info['fb'], tid=instance_info['ftid'],
-                m=min_spot_price[i], M=max_spot_price[i])
+                minst=min_spot_price[i], Minst=max_spot_price[i], M=M)
+        print(f'instance {i}: ', instance_info)
 
     print('Generating the time arrivals')
     for idx, row in avg_prices_df.iterrows():
@@ -186,7 +191,7 @@ if __name__ == '__main__':
         print('Generating arrivals for ' + row['InstanceType'])
         arrival_rate = fArrival(p=row['AvgSpotPrice'],
                                 m=min_spot_price[row['InstanceType']],
-                                M=max_spot_price[row['InstanceType']],
+                                M=M,
                                 P=args.fee_margin,
                                 k=instance_info['fk'],
                                 a=instance_info['fa'],
