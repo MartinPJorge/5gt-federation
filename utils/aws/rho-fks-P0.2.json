@@ -1,0 +1,5 @@
+{
+    "c5.2xlarge":  {"cpu": 8, "disk": 400, "memory": 16, "official_disk": "Solo EBS", "Gbps": 10, "EBSMbps": 4750, "gk": 5, "ga": 2, "gb": 0.5, "ftid": 12.5, "fa": 2, "fb": 0.5, "lifetime": 0.875, "reward": 0.4722369803063457, "fk": 13.035671163569928},
+    "c5d.4xlarge":  {"cpu": 16, "disk": 800, "memory": 32, "official_disk": "1 x 400 SSD NVMe", "Gbps": 10, "EBSMbps": 4750, "gk": 5, "ga": 2, "gb": 0.5, "ftid": 5, "fa": 2, "fb": 0.5, "lifetime": 7, "reward": 0.9627873096446699, "fk": 5.763922277357597},
+    "t3a.small":  {"cpu": 2, "disk": 100, "credit_per_hour_of_cpu": 24, "memory": 2, "official_disk": "Solo EBS", "Gbps": 5, "gk": 5, "ga": 2, "gb": 0.5, "ftid": 25, "fa": 2, "fb": 0.5, "lifetime": 0.036458333333333336, "reward": 0.06793710073710074, "fk": 25.009932686778622}
+}

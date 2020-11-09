@@ -95,6 +95,8 @@ if __name__ == '__main__':
                         help='Path of the CSV where EC2 arrivals are stored')
     parser.add_argument('--M', type=float,
                         help='maximum spot price to use')
+    parser.add_argument('--fk', type=str,
+                        help='path JSON with k for each instance')
     args = parser.parse_args()
 
 
@@ -178,11 +180,17 @@ if __name__ == '__main__':
     print(f'M={M}, 0.5M={0.5*M}')
 
     # Derive the k parameter for each fArrival()
+    fk_json = None
+    if args.fk:
+        with open(args.fk) as f:
+            fk_json = json.load(f)
     for i in min_spot_price.keys():
         instance_info = instances_info[i]
         instance_info['fk'] = what_fk(a=instance_info['fa'],
                 b=instance_info['fb'], tid=instance_info['ftid'],
-                minst=min_spot_price[i], Minst=max_spot_price[i], M=M)
+                minst=min_spot_price[i], Minst=max_spot_price[i], M=M)\
+                        if not args.fk else fk_json[i]['fk']
+        
         print(f'instance {i}: ', instance_info)
 
     print('Generating the time arrivals')
